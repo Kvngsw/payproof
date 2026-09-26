@@ -11,6 +11,12 @@
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:e2e": "tsx --env-file=.env.local scripts/e2e-smoke.ts",
+    "check:webhook": "tsx --env-file=.env.local scripts/webhook-check.ts",
+    "check:ratelimit": "tsx --env-file=.env.local scripts/ratelimit-check.ts",
+    "check:assistant": "tsx --env-file=.env.local scripts/assistant-check.ts",
+    "check:db": "tsx --env-file=.env.local scripts/db-check.ts",
+    "rail:spike": "tsx --env-file=.env.local scripts/rail-spike.ts",
     "seed": "tsx lib/seed.ts",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate"
