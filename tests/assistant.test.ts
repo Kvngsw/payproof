@@ -20,7 +20,9 @@ afterEach(() => {
 
 describe('askAssistant failover', () => {
   it('primary 200 answers with one call', async () => {
-    const fetchMock = vi.fn(async () => geminiOk('Paid, ship next.'));
+    const fetchMock = vi.fn<(url: string | URL | Request) => Promise<Response>>(async () =>
+      geminiOk('Paid, ship next.'),
+    );
     vi.stubGlobal('fetch', fetchMock);
     const res = await askAssistant(SNAPSHOT, 'Where is my order?');
     expect(res.answer).toContain('Paid');
@@ -31,7 +33,7 @@ describe('askAssistant failover', () => {
 
   it('primary 503 fails over to fallback once', async () => {
     const fetchMock = vi
-      .fn<() => Promise<Response>>()
+      .fn<(url: string | URL | Request) => Promise<Response>>()
       .mockResolvedValueOnce(geminiFail(503))
       .mockResolvedValueOnce(geminiOk('All good.'));
     vi.stubGlobal('fetch', fetchMock);
