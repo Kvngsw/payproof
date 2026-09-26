@@ -30,31 +30,44 @@ export async function sendOtp(
 
   const from = `PayProof <${fromEmail}>`;
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization:  `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from,
-      to:      email,
-      subject: 'Your PayProof login code',
-      html: `
-        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2>Your PayProof code</h2>
-          <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px;">${code}</p>
-          <p>This code expires in 10 minutes. Do not share it.</p>
-          <p style="color: #888; font-size: 12px;">If you didn't request this, ignore this email.</p>
-        </div>
-      `,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization:  `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to:      email,
+        subject: 'Your PayProof login code',
+        html: `
+          <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+            <h2>Your PayProof code</h2>
+            <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px;">${code}</p>
+            <p>This code expires in 10 minutes. Do not share it.</p>
+            <p style="color: #888; font-size: 12px;">If you didn't request this, ignore this email.</p>
+          </div>
+        `,
+      }),
+    });
+  } catch (err) {
+    logger.error('Resend unreachable, falling back to dev_screen', {
+      email,
+      err: err instanceof Error ? err : new Error(String(err)),
+    });
+    return { delivery: 'dev_screen', devCode: code };
+  }
 
   if (!response.ok) {
     const body = await response.text();
-    logger.error('Resend email failed', { email, status: response.status, body: body.slice(0, 200) });
-    throw new Error(`Resend failed: ${response.status}`); // loud failure: never pretend an email sent
+    logger.error('Resend rejected, falling back to dev_screen', {
+      email,
+      status: response.status,
+      body: body.slice(0, 200),
+    });
+    return { delivery: 'dev_screen', devCode: code }; // rail down must not block login; FE banners the mode
   }
 
   logger.info('OTP email sent', { email });

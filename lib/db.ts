@@ -6,11 +6,40 @@ import { env }         from './env';
 
 const { Pool } = pg;
 
+export class RetryPool extends Pool {
+  query<T extends pg.Submittable>(queryStream: T): T;
+  query<R extends unknown[] = unknown[], I extends unknown[] = unknown[]>(
+    queryConfig: pg.QueryArrayConfig<I>,
+    values?: pg.QueryConfigValues<I>,
+  ): Promise<R>;
+  query<R extends pg.QueryResultRow = pg.QueryResultRow, I extends unknown[] = unknown[]>(
+    queryConfig: pg.QueryConfig<I>,
+  ): Promise<pg.QueryResult<R>>;
+  query<R extends pg.QueryResultRow = pg.QueryResultRow, I extends unknown[] = unknown[]>(
+    queryTextOrConfig: string | pg.QueryConfig<I>,
+    values?: pg.QueryConfigValues<I>,
+  ): Promise<pg.QueryResult<R>>;
+  query(first: unknown, second?: unknown): Promise<unknown> {
+    if (typeof first !== 'string') {
+      return (super.query as (...a: unknown[]) => Promise<unknown>)(first, second);
+    }
+    const run = (): Promise<unknown> =>
+      (super.query as (t: string, v?: unknown) => Promise<unknown>)(first, second);
+    return run().catch(async (err: unknown) => {
+      const code = (err as { code?: string }).code;
+      if (code !== 'ECONNREFUSED' && code !== 'ENOTFOUND') throw err;
+      logger.warn('DB connection blip, retrying once', { code }); // refused pre-execution: replay cannot double-apply
+      await new Promise((r) => setTimeout(r, 500));
+      return run();
+    });
+  }
+}
+
 function createPrismaClient(): PrismaClient {
 
   const connectionString = env.APP_DATABASE_URL ?? env.DATABASE_URL; // least-privilege role at runtime; superuser only for migrate
 
-  const pool = new Pool({
+  const pool = new RetryPool({
     connectionString,
 
     max: 20, // managed Postgres caps connections; 20 per instance avoids saturation
