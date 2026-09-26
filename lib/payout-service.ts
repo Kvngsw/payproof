@@ -15,80 +15,105 @@ export interface PayoutStatus {
 }
 
 export async function releasePayout(orderId: string): Promise<PayoutStatus> {
-  return db.$transaction(async (tx) => {
-
+  const snap = await db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where:   { id: orderId },
       include: {
         seller:      true,
-        payments:    { take: 1, orderBy: { createdAt: 'desc' } },
         orderEvents: { where: { toStatus: 'Disputed' } },
         payouts:     true,
       },
     });
 
     if (!order) throw new Error(`Order ${orderId} not found`);
-
     if (order.status !== 'Completed') {
       throw new Error(`Order ${orderId} is not Completed (status: ${order.status})`);
     }
-
     if (order.orderEvents.length > 0) { // belt-and-braces: scan history even though status gates first
       throw new PayoutFrozenError(orderId);
     }
-
-    const claim = await tx.order.updateMany({
+    if (order.payouts.length > 0) {
+      return { done: true as const, order };
+    }
+    await tx.order.updateMany({
       where: { id: orderId, payoutClaimedAt: null }, // atomic check-and-set: double-clicks and retries hit 0 rows
       data:  { payoutClaimedAt: new Date() },
     });
+    return { done: false as const, order };
+  });
 
-    if (claim.count === 0) {
-      logger.info('Payout already claimed — idempotent no-op', { orderId });
+  if (snap.done) {
+    logger.info('Payout already recorded — idempotent replay', { orderId });
+    return buildPayoutStatus(snap.order.payouts);
+  }
 
-      return buildPayoutStatus(order.payouts);
-    }
+  const { order } = snap;
+  const seller = order.seller;
+  if (!seller?.settlementBank || !seller?.settlementNumber) {
+    await db.order.update({ where: { id: orderId }, data: { payoutClaimedAt: null } });
+    throw new Error('Seller has no settlement account configured.');
+  }
 
-    const seller = order.seller;
-    if (!seller?.settlementBank || !seller?.settlementNumber) {
+  const sourceAccount = process.env.MONNIFY_WALLET_ACCOUNT_NUMBER!;
+  const { sellerKobo, logisticsKobo } = splitPayout(
+    order.productPriceKobo,
+    order.dispatchFeeKobo,
+  );
 
-      await tx.order.update({
-        where: { id: orderId },
-        data:  { payoutClaimedAt: null },
-      });
-      throw new Error('Seller has no settlement account configured.');
-    }
+  const sellerRef     = `payout_${orderId}_seller`;
+  const logisticsRef  = `payout_${orderId}_logistics`; // deterministic refs: Monnify dedupes by reference on retry
 
-    const sourceAccount = process.env.MONNIFY_WALLET_ACCOUNT_NUMBER!;
-    const { sellerKobo, logisticsKobo } = splitPayout(
-      order.productPriceKobo,
-      order.dispatchFeeKobo,
-    );
+  let sellerTransfer: { status: string; reference: string };
+  try {
+    sellerTransfer = await initiatePayout({
+      amountKobo:               sellerKobo,
+      reference:                sellerRef,
+      narration:                `PayProof payout — product (order ${orderId})`,
+      destinationBankCode:      seller.settlementBank,
+      destinationAccountNumber: seller.settlementNumber,
+      destinationAccountName:   seller.settlementName ?? '',
+      sourceAccountNumber:      sourceAccount,
+    });
+  } catch (err) {
+    await db.order.update({ where: { id: orderId }, data: { payoutClaimedAt: null } });
+    throw err;
+  }
 
-    const sellerRef     = `payout_${orderId}_seller`;
-    const logisticsRef  = `payout_${orderId}_logistics`; // deterministic refs: Monnify dedupes by reference on retry
+  logger.info('Seller payout sent', {
+    orderId,
+    ref: sellerRef,
+    amountKobo: sellerKobo,
+    status: sellerTransfer.status,
+  });
 
-    let sellerTransfer: { status: string; reference: string };
-    try {
-      sellerTransfer = await initiatePayout({
-        amountKobo:               sellerKobo,
-        reference:                sellerRef,
-        narration:                `PayProof payout — product (order ${orderId})`,
-        destinationBankCode:      seller.settlementBank,
-        destinationAccountNumber: seller.settlementNumber,
-        destinationAccountName:   seller.settlementName ?? '',
-        sourceAccountNumber:      sourceAccount,
-      });
-    } catch (err) {
+  const logisticsBankCode      = process.env.LOGISTICS_BANK_CODE!;
+  const logisticsAccountNumber = process.env.LOGISTICS_ACCOUNT_NUMBER!;
+  const logisticsAccountName   = process.env.LOGISTICS_ACCOUNT_NAME!;
 
-      await tx.order.update({
-        where: { id: orderId },
-        data:  { payoutClaimedAt: null },
-      });
-      throw err;
-    }
+  let logisticsStatus = 'held';
+  let logisticsTransfer: { status: string; reference: string } | null = null;
 
-    await tx.payout.create({
-      data: {
+  try {
+    logisticsTransfer = await initiatePayout({
+      amountKobo:               logisticsKobo,
+      reference:                logisticsRef,
+      narration:                `PayProof logistics fee (order ${orderId})`,
+      destinationBankCode:      logisticsBankCode,
+      destinationAccountNumber: logisticsAccountNumber,
+      destinationAccountName:   logisticsAccountName,
+      sourceAccountNumber:      sourceAccount,
+    });
+    logisticsStatus = logisticsTransfer.status === 'SUCCESS' ? 'paid' : 'pending';
+  } catch (err) {
+    logger.error('Logistics payout failed — fee held', { orderId, err });
+    logisticsStatus = 'held';
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.payout.upsert({
+      where:  { transferRef: sellerRef },
+      update: {},
+      create: {
         orderId,
         recipientType: 'seller',
         amountKobo:    sellerKobo,
@@ -97,40 +122,10 @@ export async function releasePayout(orderId: string): Promise<PayoutStatus> {
         raw:           sellerTransfer as object,
       },
     });
-
-    logger.info('Seller payout sent', {
-      orderId,
-      ref: sellerRef,
-      amountKobo: sellerKobo,
-      status: sellerTransfer.status,
-    });
-
-    const logisticsBankCode      = process.env.LOGISTICS_BANK_CODE!;
-    const logisticsAccountNumber = process.env.LOGISTICS_ACCOUNT_NUMBER!;
-    const logisticsAccountName   = process.env.LOGISTICS_ACCOUNT_NAME!;
-
-    let logisticsStatus = 'held';
-    let logisticsTransfer: { status: string; reference: string } | null = null;
-
-    try {
-      logisticsTransfer = await initiatePayout({
-        amountKobo:               logisticsKobo,
-        reference:                logisticsRef,
-        narration:                `PayProof logistics fee (order ${orderId})`,
-        destinationBankCode:      logisticsBankCode,
-        destinationAccountNumber: logisticsAccountNumber,
-        destinationAccountName:   logisticsAccountName,
-        sourceAccountNumber:      sourceAccount,
-      });
-      logisticsStatus = logisticsTransfer.status === 'SUCCESS' ? 'paid' : 'pending';
-    } catch (err) {
-
-      logger.error('Logistics payout failed — fee held', { orderId, err });
-      logisticsStatus = 'held';
-    }
-
-    await tx.payout.create({
-      data: {
+    await tx.payout.upsert({
+      where:  { transferRef: logisticsRef },
+      update: {},
+      create: {
         orderId,
         recipientType: 'logistics',
         amountKobo:    logisticsKobo,
@@ -139,25 +134,25 @@ export async function releasePayout(orderId: string): Promise<PayoutStatus> {
         raw:           logisticsTransfer as object,
       },
     });
-
-    logger.info('Logistics payout handled', {
-      orderId,
-      ref: logisticsRef,
-      amountKobo: logisticsKobo,
-      status: logisticsStatus,
-    });
-
-    const overallStatus =
-      logisticsStatus === 'held' ? 'partial' : 'paid';
-
-    return {
-      status: overallStatus,
-      transfers: [
-        { to: 'seller',    amountKobo: sellerKobo,    status: sellerTransfer.status,   ref: sellerRef },
-        { to: 'logistics', amountKobo: logisticsKobo, status: logisticsStatus, ref: logisticsRef },
-      ],
-    };
   });
+
+  logger.info('Logistics payout handled', {
+    orderId,
+    ref: logisticsRef,
+    amountKobo: logisticsKobo,
+    status: logisticsStatus,
+  });
+
+  const overallStatus =
+    logisticsStatus === 'held' ? 'partial' : 'paid';
+
+  return {
+    status: overallStatus,
+    transfers: [
+      { to: 'seller',    amountKobo: sellerKobo,    status: sellerTransfer.status,   ref: sellerRef },
+      { to: 'logistics', amountKobo: logisticsKobo, status: logisticsStatus, ref: logisticsRef },
+    ],
+  };
 }
 
 function buildPayoutStatus(
