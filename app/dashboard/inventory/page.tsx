@@ -1,0 +1,420 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  createProduct,
+  deleteProduct,
+  listProducts,
+  updateProduct,
+  type MockProduct,
+} from "@/lib/api/mock";
+import { useDashboardSession } from "@/components/dashboard/session-context";
+import { ProductThumb } from "@/components/dashboard/product-thumb";
+import { Amount } from "@/components/amount";
+import { IconPlus, IconDots, IconPencil, IconTrash } from "@tabler/icons-react";
+
+type FormState = {
+  name: string;
+  price: string;
+  stock: string;
+  description: string;
+  image_url: string;
+};
+
+const EMPTY_FORM: FormState = {
+  name: "",
+  price: "",
+  stock: "",
+  description: "",
+  image_url: "",
+};
+
+function toForm(product: MockProduct): FormState {
+  return {
+    name: product.name,
+    price: String(product.price_kobo / 100),
+    stock: String(product.stock_quantity),
+    description: product.description,
+    image_url: product.image_url,
+  };
+}
+
+function StockChip({ stock }: { stock: number }) {
+  if (stock <= 0) {
+    return (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground">
+        <span className="size-1.5 rounded-full bg-muted-foreground/50" />
+        Out of stock
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground">
+      <span className="size-1.5 rounded-full bg-primary/70" />
+      {stock} in stock
+    </span>
+  );
+}
+
+export default function InventoryPage() {
+  const session = useDashboardSession();
+  const [products, setProducts] = useState<MockProduct[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<MockProduct | null>(null);
+  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (session.status !== "authed") return;
+    let cancelled = false;
+    listProducts()
+      .then((data) => {
+        if (!cancelled) setProducts(data);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session.status]);
+
+  function openAdd() {
+    setEditing(null);
+    setForm(EMPTY_FORM);
+    setSheetOpen(true);
+  }
+
+  function openEdit(product: MockProduct) {
+    setEditing(product);
+    setForm(toForm(product));
+    setSheetOpen(true);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const name = form.name.trim();
+    const price = Number(form.price);
+    if (!name) {
+      toast.error("Product name is required");
+      return;
+    }
+    if (!Number.isFinite(price) || price <= 0) {
+      toast.error("Enter a price greater than zero");
+      return;
+    }
+
+    setBusy(true);
+    const payload = {
+      name,
+      price_kobo: Math.round(price * 100),
+      stock_quantity: Math.max(0, Math.round(Number(form.stock) || 0)),
+      description: form.description.trim(),
+      image_url: form.image_url.trim(),
+    };
+
+    try {
+      if (editing) {
+        const updated = await updateProduct(editing.id, payload);
+        setProducts((prev) =>
+          prev ? prev.map((p) => (p.id === updated.id ? updated : p)) : prev,
+        );
+        toast.success("Product updated");
+      } else {
+        const created = await createProduct(payload);
+        setProducts((prev) => [created, ...(prev ?? [])]);
+        toast.success("Product added");
+      }
+      setSheetOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete(product: MockProduct) {
+    try {
+      await deleteProduct(product.id);
+      setProducts((prev) => (prev ?? []).filter((p) => p.id !== product.id));
+      toast.success("Product deleted");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
+    }
+  }
+
+  const loading = session.status === "loading" || (products === null && !failed);
+
+  return (
+    <div className="space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl">
+            Inventory
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Products you can pull into invoices.
+          </p>
+        </div>
+        <Button onClick={openAdd}>
+          <IconPlus className="size-4" />
+          Add product
+        </Button>
+      </header>
+
+      {loading ? (
+        <div className="space-y-3" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-14 animate-pulse rounded-lg bg-muted/40" />
+          ))}
+        </div>
+      ) : failed ? (
+        <div className="rounded-xl border border-dashed border-border/60 p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            Couldn&apos;t load your inventory.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-4"
+            onClick={() => {
+              setFailed(false);
+              setProducts(null);
+              listProducts()
+                .then(setProducts)
+                .catch(() => setFailed(true));
+            }}
+          >
+            Try again
+          </Button>
+        </div>
+      ) : products && products.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border/60 p-10 text-center">
+          <h2 className="font-heading text-lg font-bold">No products yet</h2>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+            Add your first product so you can include it on an invoice.
+          </p>
+          <Button className="mt-4" onClick={openAdd}>
+            <IconPlus className="size-4" />
+            Add product
+          </Button>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-border/60 bg-card shadow-sm">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead className="text-right">Price</TableHead>
+                <TableHead>Stock</TableHead>
+                <TableHead className="w-12" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(products ?? []).map((product) => (
+                <TableRow key={product.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <ProductThumb
+                        url={product.image_url}
+                        name={product.name}
+                        className="size-10 shrink-0 rounded-lg"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{product.name}</p>
+                        {product.description && (
+                          <p className="hidden max-w-56 truncate text-xs text-muted-foreground sm:block">
+                            {product.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    <Amount value={product.price_kobo / 100} />
+                  </TableCell>
+                  <TableCell>
+                    <StockChip stock={product.stock_quantity} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Actions for ${product.name}`}
+                          />
+                        }
+                      >
+                        <IconDots className="size-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            openEdit(product);
+                          }}
+                        >
+                          <IconPencil className="size-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onSelect={() => {
+                            handleDelete(product);
+                          }}
+                        >
+                          <IconTrash className="size-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <Sheet
+        open={sheetOpen}
+        onOpenChange={(open) => {
+          setSheetOpen(open);
+        }}
+      >
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>{editing ? "Edit product" : "Add product"}</SheetTitle>
+          </SheetHeader>
+
+          <form
+            onSubmit={handleSubmit}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <div className="flex-1 space-y-4 overflow-y-auto px-6">
+              <div className="space-y-1.5">
+                <Label htmlFor="product-name">Name</Label>
+                <Input
+                  id="product-name"
+                  placeholder="Air Runner Sneakers"
+                  value={form.name}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-price">Price (₦)</Label>
+                  <Input
+                    id="product-price"
+                    type="number"
+                    min="1"
+                    step="any"
+                    placeholder="45000"
+                    value={form.price}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, price: e.target.value }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="product-stock">Stock</Label>
+                  <Input
+                    id="product-stock"
+                    type="number"
+                    min="0"
+                    placeholder="10"
+                    value={form.stock}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, stock: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="product-description">Description</Label>
+                <Input
+                  id="product-description"
+                  placeholder="Lightweight running sneakers"
+                  value={form.description}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, description: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="product-image">Image URL</Label>
+                <div className="flex items-center gap-3">
+                  <ProductThumb
+                    url={form.image_url.trim()}
+                    name={form.name || "Product"}
+                    className="size-12 shrink-0 rounded-lg border border-border/60"
+                  />
+                  <Input
+                    id="product-image"
+                    placeholder="https://..."
+                    value={form.image_url}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, image_url: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+
+            <SheetFooter className="flex-row justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSheetOpen(false)}
+                disabled={busy}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={busy}>
+                {busy
+                  ? "Saving..."
+                  : editing
+                    ? "Save changes"
+                    : "Add product"}
+              </Button>
+            </SheetFooter>
+          </form>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}

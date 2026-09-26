@@ -234,7 +234,7 @@ function TimelineTitle({
   ...props
 }: useRender.ComponentProps<"h3">) {
   const defaultProps = {
-    className: cn("font-medium text-sm", className),
+    className: cn("font-medium text-foreground text-sm", className),
     "data-slot": "timeline-title",
     children,
   }

@@ -292,3 +292,66 @@ export function ensureOrdersForSeller(seller: any) {
 
   db.orders.insertMany(SEED_ORDERS.map((spec, i) => buildOrder(seller, spec, i)));
 }
+
+export const SEED_PRODUCTS = [
+  {
+    name: "Air Runner Sneakers",
+    price_kobo: 4500000,
+    stock_quantity: 12,
+    description: "Lightweight running sneakers with a cushioned sole.",
+    image_url: "",
+  },
+  {
+    name: "Court Classic Loafers",
+    price_kobo: 3200000,
+    stock_quantity: 8,
+    description: "Classic leather loafers for court and street.",
+    image_url: "",
+  },
+  {
+    name: "Canvas Slip-Ons",
+    price_kobo: 2800000,
+    stock_quantity: 20,
+    description: "Everyday canvas slip-ons, easy on and off.",
+    image_url: "",
+  },
+  {
+    name: "Retro High Tops",
+    price_kobo: 5100000,
+    stock_quantity: 5,
+    description: "Retro high-top sneakers with a padded collar.",
+    image_url: "",
+  },
+  {
+    name: "Trail Hiker Boots",
+    price_kobo: 6750000,
+    stock_quantity: 0,
+    description: "Waterproof trail boots for rough terrain.",
+    image_url: "",
+  },
+  {
+    name: "Suede Chukka Boots",
+    price_kobo: 5400000,
+    stock_quantity: 6,
+    description: "Soft suede chukka boots, smart casual fit.",
+    image_url: "",
+  },
+];
+
+export function ensureProductsForSeller(seller: any) {
+  if (!seller.seeded_demo) return;
+
+  const existing = db.products.findBySeller(seller.id);
+  const have = new Set(existing.map((p) => p.name));
+  const missing = SEED_PRODUCTS.filter((p) => !have.has(p.name));
+  if (missing.length === 0) return;
+
+  db.products.insertMany(
+    missing.map((p) => ({
+      id: generateId(),
+      seller_id: seller.id,
+      created_at: new Date().toISOString(),
+      ...p,
+    })),
+  );
+}

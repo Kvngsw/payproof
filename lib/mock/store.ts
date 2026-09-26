@@ -4,7 +4,14 @@ import crypto from "node:crypto";
 
 const DATA_DIR = path.join(process.cwd(), "mock-data");
 
-const COLLECTIONS = ["sellers", "buyers", "otp_codes", "orders"] as const;
+const COLLECTIONS = [
+  "sellers",
+  "buyers",
+  "otp_codes",
+  "orders",
+  "products",
+  "invoices",
+] as const;
 export type CollectionName = (typeof COLLECTIONS)[number];
 
 export function collectionFile(name: CollectionName) {
@@ -42,6 +49,10 @@ export function ensureCollectionFiles() {
 
 export function generateId() {
   return crypto.randomUUID();
+}
+
+export function generateInvoiceCode() {
+  return "INV-" + crypto.randomBytes(3).toString("hex").toUpperCase();
 }
 
 export function hashPassword(password: string) {
@@ -102,6 +113,68 @@ export const db = {
       if (!row) return null;
       mutator(row);
       writeCollection("orders", rows);
+      return row;
+    },
+  },
+  products: {
+    findBySeller: (sellerId: string) => {
+      return readCollection("products").filter((p) => p.seller_id === sellerId);
+    },
+    findById: (id: string) => {
+      return readCollection("products").find((p) => p.id === id);
+    },
+    insert: (product: any) => {
+      const rows = readCollection("products");
+      rows.push(product);
+      writeCollection("products", rows);
+    },
+    insertMany: (products: any[]) => {
+      const rows = readCollection("products");
+      rows.push(...products);
+      writeCollection("products", rows);
+    },
+    updateById: (productId: string, mutator: (product: any) => void) => {
+      const rows = readCollection("products");
+      const row = rows.find((p) => p.id === productId);
+      if (!row) return null;
+      mutator(row);
+      writeCollection("products", rows);
+      return row;
+    },
+    removeById: (productId: string) => {
+      const rows = readCollection("products");
+      const next = rows.filter((p) => p.id !== productId);
+      if (next.length === rows.length) return false;
+      writeCollection("products", next);
+      return true;
+    },
+  },
+  invoices: {
+    findBySeller: (sellerId: string) => {
+      return readCollection("invoices").filter(
+        (i) => i.seller_id === sellerId,
+      );
+    },
+    findById: (id: string) => {
+      return readCollection("invoices").find((i) => i.id === id);
+    },
+    findByCode: (code: string) => {
+      const target = code.toUpperCase();
+      return readCollection("invoices").find(
+        (i) => String(i.code ?? i.id).toUpperCase() === target,
+      );
+    },
+    insert: (invoice: any) => {
+      const rows = readCollection("invoices");
+      rows.push(invoice);
+      writeCollection("invoices", rows);
+    },
+    updateById: (invoiceId: string, mutator: (invoice: any) => void) => {
+      const rows = readCollection("invoices");
+      const row = rows.find((i) => i.id === invoiceId);
+      if (!row) return null;
+      mutator(row);
+      writeCollection("invoices", rows);
       return row;
     },
   },

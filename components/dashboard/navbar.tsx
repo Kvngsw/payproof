@@ -12,6 +12,8 @@ import { useDashboardSession } from "./session-context";
 
 const NAV_ITEMS = [
   { label: "Home", href: "/dashboard" },
+  { label: "Invoices", href: "/dashboard/invoices" },
+  { label: "Inventory", href: "/dashboard/inventory" },
   { label: "Orders", href: "/dashboard/orders" },
 ] as const;
 

@@ -277,7 +277,7 @@ export default function OrderDetailPage() {
 
           <section>
             <SectionHeading>Timeline</SectionHeading>
-            <div className="mt-4 [zoom:1.3]">
+            <div className="mt-4 [zoom:1.1]">
             <Timeline value={completedCount} className="w-full">
               {timelineItems.map((item, i) => (
                 <TimelineItem key={`${i}-${item.title}`} step={i + 1}>
@@ -292,7 +292,7 @@ export default function OrderDetailPage() {
                       <TimelineDate>{item.date}</TimelineDate>
                       <TimelineTitle>{item.title}</TimelineTitle>
                     </TimelineHeader>
-                    <p>{item.body}</p>
+                    <p className="capitalize">{item.body}</p>
                   </TimelineContent>
                 </TimelineItem>
               ))}

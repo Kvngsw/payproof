@@ -186,3 +186,102 @@ export async function updateTracking(
     body: JSON.stringify(payload),
   });
 }
+
+export type MockProduct = {
+  id: string;
+  name: string;
+  price_kobo: number;
+  description: string;
+  image_url: string;
+  stock_quantity: number;
+  created_at: string;
+};
+
+export type MockInvoiceItem = {
+  product_id: string;
+  name: string;
+  image_url: string;
+  quantity: number;
+  unit_price_kobo: number;
+};
+
+export type MockInvoice = {
+  id: string;
+  seller_id: string;
+  items: MockInvoiceItem[];
+  product_kobo: number;
+  total_kobo: number;
+  customer: { name: string; contact: string };
+  note: string;
+  status: "pending" | "paid" | "cancelled";
+  order_id: string | null;
+  created_at: string;
+  paid_at: string | null;
+};
+
+export async function listProducts(): Promise<MockProduct[]> {
+  return authFetch("/products");
+}
+
+export async function createProduct(payload: {
+  name: string;
+  price_kobo: number;
+  description?: string;
+  image_url?: string;
+  stock_quantity?: number;
+}): Promise<MockProduct> {
+  return authFetch("/products", { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function updateProduct(
+  id: string,
+  payload: Partial<{
+    name: string;
+    price_kobo: number;
+    description: string;
+    image_url: string;
+    stock_quantity: number;
+  }>,
+): Promise<MockProduct> {
+  return authFetch(`/products/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteProduct(id: string): Promise<void> {
+  await authFetch(`/products/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function listInvoices(): Promise<MockInvoice[]> {
+  return authFetch("/invoices");
+}
+
+export async function createInvoice(payload: {
+  code: string;
+  items: { product_id: string; quantity: number }[];
+  customer_name: string;
+  customer_contact?: string;
+  note?: string;
+}): Promise<MockInvoice> {
+  return authFetch("/invoices", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function cancelInvoice(id: string): Promise<MockInvoice> {
+  return authFetch(`/invoices/${encodeURIComponent(id)}/cancel`, {
+    method: "POST",
+  });
+}
+
+export async function getInvoice(id: string): Promise<MockInvoice> {
+  const res = await fetch(`${API}/invoices/${encodeURIComponent(id)}`);
+  return handleResponse(res);
+}
+
+export function invoiceLink(id: string) {
+  if (typeof window === "undefined") return `/invoice/${id}`;
+  return `${window.location.origin}/invoice/${id}`;
+}
