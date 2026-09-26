@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Inter, Manrope } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { SmoothScroll } from "@/components/smooth-scroll"
+import { Toaster } from "sonner"
 import { cn } from "@/lib/utils";
 
 const manropeHeading = Manrope({subsets:['latin'],variable:'--font-heading'});
@@ -27,6 +28,7 @@ export default function RootLayout({
     >
       <body>
         <ThemeProvider>{children}</ThemeProvider>
+        <Toaster position="top-center"/>
         <SmoothScroll />
       </body>
     </html>
