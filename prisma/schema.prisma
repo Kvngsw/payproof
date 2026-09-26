@@ -1,0 +1,243 @@
+// PayProof 2.0 — Prisma Schema
+//
+// Design decisions:
+//
+// WHY (UUID ids, not auto-increment integers):
+//   Sequential integers let anyone enumerate other users' resource URLs.
+//   UUIDs are unguessable — even a public order URL leaks nothing.
+//
+// WHY (Int kobo, not Float naira):
+//   Floating point arithmetic is fundamentally broken for exact financial
+//   values. 0.1 + 0.2 ≠ 0.3 in IEEE-754. Integer kobo never has this problem.
+//
+// WHY (order_events table, not timestamps JSON blob):
+//   1.0 stored timestamps in a JSON blob — unqueryable with SQL JOINs.
+//   2.0 uses a relational table: "all Disputed orders for seller X" = 1 query.
+//
+// WHY (Payment table, separate from Order):
+//   Separates the payment record from the order record. Enables idempotent
+//   webhook processing (unique reference index). Stores the raw Monnify
+//   response for auditing.
+//
+// WHY (Payout table, separate from Order):
+//   Two payouts per order (seller + logistics). Each has its own transferRef
+//   (unique) for Monnify-level idempotency. Status tracked independently.
+//
+// WHY (OtpCode table, not in-memory):
+//   Serverless functions have no shared memory. OTPs must be stored in the DB.
+//   codeHash = bcrypt(code) — never plaintext in the DB.
+//
+// WHY (WebhookEvent table):
+//   Atomic deduplication. The row is claimed before processing. If the
+//   function crashes, Monnify retries and finds a processed=false row,
+//   which triggers re-processing. processed=true = permanent stop.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Sellers ──────────────────────────────────────────────────────────────────
+
+model Seller {
+  id           String   @id @default(uuid())
+  name         String
+  businessName String
+  email        String   @unique
+  passwordHash String
+  phone        String
+  // Reserved account (buyer pays into this)
+  reservedAccountNumber String?
+  reservedBankName      String?
+  reservedAccountName   String?
+  // Settlement account (payout goes here)
+  settlementBank        String?
+  settlementNumber      String?
+  settlementName        String?
+  // Monnify internal ref for this seller's reserved account
+  railCustomerRef       String?
+  // BVN stored as SHA-256 hash — never plaintext. Used for Monnify.
+  bvnHash               String?
+  createdAt    DateTime @default(now())
+
+  products  Product[]
+  orders    Order[]
+
+  @@index([email])
+  @@map("sellers")
+}
+
+// ── Buyers ───────────────────────────────────────────────────────────────────
+
+model Buyer {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  orders    Order[]
+  otpCodes  OtpCode[]
+
+  @@map("buyers")
+}
+
+// ── OTP codes ─────────────────────────────────────────────────────────────────
+
+model OtpCode {
+  id        String    @id @default(uuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  buyer     Buyer?    @relation(fields: [email], references: [email])
+
+  @@index([email])
+  @@index([expiresAt])
+  @@map("otp_codes")
+}
+
+// ── Products ──────────────────────────────────────────────────────────────────
+
+model Product {
+  id              String   @id @default(uuid())
+  sellerId        String
+  name            String
+  priceKobo       Int      // integer kobo — never float
+  description     String
+  imageUrl        String?
+  stockQuantity   Int      @default(1)
+  dispatchFeeKobo Int      // held in escrow alongside product price
+  deliveryDays    Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  seller  Seller  @relation(fields: [sellerId], references: [id])
+  orders  Order[]
+
+  @@index([sellerId])
+  @@map("products")
+}
+
+// ── Orders ────────────────────────────────────────────────────────────────────
+
+model Order {
+  id              String   @id @default(uuid())
+  sellerId        String
+  buyerId         String?
+  productId       String
+  // Price snapshot — locked at order creation, never re-read from Product
+  productPriceKobo  Int
+  dispatchFeeKobo   Int
+  totalKobo         Int     // = productPriceKobo + dispatchFeeKobo, always exact
+  deliveryDays      Int     // snapshot from product at order time
+  // Status
+  status          String   @default("PendingPayment")
+  // Delivery info
+  deliveryAddress String
+  buyerPhone      String?
+  // Tracking
+  trackingStatus  String?
+  trackingNumber  String?
+  trackingSource  String?  @default("manual") // 'manual' | 'courier_api'
+  // Fraud flag (rule-based, stored as JSON)
+  fraudFlag       Json?
+  // Payout idempotency guard — see payout-service.ts
+  payoutClaimedAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  seller      Seller       @relation(fields: [sellerId], references: [id])
+  buyer       Buyer?       @relation(fields: [buyerId], references: [id])
+  product     Product      @relation(fields: [productId], references: [id])
+  payments    Payment[]
+  payouts     Payout[]
+  orderEvents OrderEvent[]
+
+  @@index([sellerId])
+  @@index([buyerId])
+  @@index([productId])
+  @@index([status])
+  @@index([sellerId, status])
+  @@map("orders")
+}
+
+// ── Payments ──────────────────────────────────────────────────────────────────
+// One payment per order. reference is unique — the idempotency key.
+
+model Payment {
+  id               String    @id @default(uuid())
+  orderId          String    @unique
+  provider         String    @default("monnify")
+  reference        String    @unique   // OUR ref (webhook lookup key, E12/E15)
+  providerRef      String?             // Monnify's transactionReference (verify calls)
+  status           String    @default("pending")
+  verificationMode String    @default("live") // 'live' | 'cached_fallback'
+  amountKobo       Int
+  raw              Json?     // full Monnify response for audit
+  paidAt           DateTime?
+  createdAt        DateTime  @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([reference])
+  @@map("payments")
+}
+
+// ── Payouts ───────────────────────────────────────────────────────────────────
+// Two payouts per order: 'seller' and 'logistics'.
+// transferRef unique = Monnify-level idempotency on retry.
+
+model Payout {
+  id            String   @id @default(uuid())
+  orderId       String
+  recipientType String   // 'seller' | 'logistics'
+  amountKobo    Int
+  status        String   @default("pending") // 'pending' | 'paid' | 'held' | 'failed'
+  transferRef   String   @unique             // deterministic: payout_{orderId}_{type}
+  raw           Json?
+  createdAt     DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("payouts")
+}
+
+// ── Order events ──────────────────────────────────────────────────────────────
+// Authoritative audit trail. Replaces 1.0's timestamps JSON blob.
+// Queryable with SQL JOINs.
+
+model OrderEvent {
+  id         String   @id @default(uuid())
+  orderId    String
+  fromStatus String
+  toStatus   String
+  actor      String   // 'system' | 'seller' | 'buyer'
+  note       String?
+  createdAt  DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([toStatus])
+  @@map("order_events")
+}
+
+// ── Webhook events ────────────────────────────────────────────────────────────
+// Deduplication table for Monnify webhooks.
+// id = transactionReference (Monnify's unique ref).
+
+model WebhookEvent {
+  id         String   @id
+  receivedAt DateTime @default(now())
+  processed  Boolean  @default(false)
+  payload    Json
+
+  @@index([processed])
+  @@map("webhook_events")
+}
