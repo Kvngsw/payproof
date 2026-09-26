@@ -2,8 +2,14 @@ import { logger }     from './logger';
 import { RailTimeoutError } from './errors';
 import { env } from './env';
 
-const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
+function modelUrl(model: string): string {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+}
+
+// 2.5 retired without warning: 404/503 fail over once within the same 10s
+// deadline, so the user never waits double. 429 means slow down, not
+// reroute — straight to 502.
+const FAILOVER_STATUSES = new Set([404, 503]);
 
 const REFUSAL =
   "I can only answer questions about this specific order. " +
@@ -54,16 +60,30 @@ export async function askAssistant(
   };
 
   const controller = new AbortController();
-  const timeout    = setTimeout(() => controller.abort(), 10_000); // spec E22: 10s, then 502
+  const timeout    = setTimeout(() => controller.abort(), 10_000); // spec E22: 10s total, shared across failover
 
-  let response: Response;
-  try {
-    response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+  const callModel = (model: string): Promise<Response> =>
+    fetch(`${modelUrl(model)}?key=${apiKey}`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(requestBody),
       signal:  controller.signal,
     });
+
+  let response: Response;
+  let model = env.GEMINI_MODEL;
+  try {
+    response = await callModel(model);
+    if (!response.ok && FAILOVER_STATUSES.has(response.status) && env.GEMINI_FALLBACK_MODEL !== model) {
+      logger.warn('Gemini primary failed, failing over', {
+        from: model,
+        to: env.GEMINI_FALLBACK_MODEL,
+        status: response.status,
+        orderId: orderSnapshot.id,
+      });
+      model = env.GEMINI_FALLBACK_MODEL;
+      response = await callModel(model);
+    }
   } catch (err) {
     clearTimeout(timeout);
     if (err instanceof Error && err.name === 'AbortError') {
@@ -76,7 +96,7 @@ export async function askAssistant(
 
   if (!response.ok) {
     const body = await response.text();
-    logger.error('Gemini API error', { status: response.status, body: body.slice(0, 200) });
+    logger.error('Gemini API error', { status: response.status, model, body: body.slice(0, 200) });
     throw new RailTimeoutError('AI assistant unavailable.');
   }
 
@@ -91,6 +111,7 @@ export async function askAssistant(
 
   logger.info('Assistant response generated', {
     orderId:     orderSnapshot.id,
+    model,
     answerLen:   answer.length,
   });
 

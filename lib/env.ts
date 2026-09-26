@@ -32,6 +32,8 @@ const schema = z.object({
   OTP_MODE: z.enum(['dev', 'live']).default('dev'),
 
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
+  GEMINI_MODEL: z.string().min(1).default('gemini-3.8-flash'), // config, not code: Google retires models without warning
+  GEMINI_FALLBACK_MODEL: z.string().min(1).default('gemini-3.5-flash'),
 
   AI_SYSTEM_PROMPT: z.string().optional(),
 
