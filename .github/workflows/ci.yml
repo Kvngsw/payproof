@@ -1,0 +1,44 @@
+# PayProof 2.0 CI — typecheck + unit tests + schema validation on every PR.
+# QA-02 acceptance: green here before M4 freeze.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    env:
+      # Dummy values satisfy fail-fast env validation for pure unit tests.
+      # No real secrets, no DB connection — DB-gated checks run on deploy env.
+      DATABASE_URL: postgresql://user:pass@localhost:5432/ci
+      DIRECT_URL: postgresql://user:pass@localhost:5432/ci
+      JWT_SECRET: ci-dummy-secret-min-32-chars-0123456789
+      MONNIFY_API_KEY: MK_TEST_CI
+      MONNIFY_SECRET_KEY: CI_SECRET
+      MONNIFY_CONTRACT_CODE: "0000000000"
+      MONNIFY_BASE_URL: https://sandbox.monnify.com
+      MONNIFY_WALLET_ACCOUNT_NUMBER: "0000000000"
+      RESEND_API_KEY: ci-dummy
+      GEMINI_API_KEY: ci-dummy
+      LOGISTICS_BANK_CODE: "058"
+      LOGISTICS_ACCOUNT_NUMBER: "0000000000"
+      LOGISTICS_ACCOUNT_NAME: CI Logistics
+      OTP_MODE: dev
+      DEMO_FALLBACK: "false"
+      LOG_LEVEL: error
+      NODE_ENV: test
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - run: npx prisma validate
