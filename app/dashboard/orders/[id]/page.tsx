@@ -21,8 +21,6 @@ import {
 import {
   IconArrowLeft,
   IconCheck,
-  IconMapPin,
-  IconTruck,
   IconAlertTriangle,
 } from "@tabler/icons-react";
 
@@ -36,20 +34,36 @@ function formatDateTime(iso: string) {
   });
 }
 
-function Card({
-  title,
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      {children}
+    </h2>
+  );
+}
+
+function Row({
+  label,
+  strong,
   children,
 }: {
-  title: string;
+  label: string;
+  strong?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
-      <div className="border-b border-dashed border-border/60 pb-3">
-        <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
-      </div>
-      <div className="pt-4">{children}</div>
-    </section>
+    <div className="flex items-start justify-between gap-4 border-b border-dashed border-border/60 py-2.5 last:border-b-0">
+      <dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
+      <dd
+        className={
+          strong
+            ? "text-right text-base font-semibold"
+            : "text-right text-sm font-medium"
+        }
+      >
+        {children}
+      </dd>
+    </div>
   );
 }
 
@@ -237,48 +251,33 @@ export default function OrderDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-6">
-          <Card title="Order details">
-            <dl className="grid gap-4">
-              <div>
-                <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Buyer
-                </dt>
-                <dd className="pt-1 text-sm font-medium">
-                  {order.buyer_email ?? "—"}
-                </dd>
-              </div>
-              <div className="flex items-start gap-3">
-                <IconMapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Delivery address
-                  </dt>
-                  <dd className="pt-0.5 text-sm font-medium">
-                    {order.delivery_address}
-                  </dd>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <IconTruck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Tracking
-                  </dt>
-                  <dd className="pt-0.5 text-sm font-medium">
-                    {tracked ?? "Not shipped yet"}
-                    {order.tracking?.number && ` · ${order.tracking.number}`}
-                    {tracked && order.tracking?.source === "manual" && (
-                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
+          <section>
+            <SectionHeading>Order details</SectionHeading>
+            <dl className="mt-2">
+              <Row label="Buyer">{order.buyer_email ?? "—"}</Row>
+              <Row label="Delivery address">{order.delivery_address}</Row>
+              <Row label="Tracking">
+                {tracked ? (
+                  <>
+                    {tracked}
+                    {order.tracking?.number &&
+                      ` · ${order.tracking.number}`}
+                    {order.tracking?.source === "manual" && (
+                      <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
                         {order.tracking.label}
                       </span>
                     )}
-                  </dd>
-                </div>
-              </div>
+                  </>
+                ) : (
+                  "Not shipped yet"
+                )}
+              </Row>
             </dl>
-          </Card>
+          </section>
 
-          <div className="[zoom:1.3]">
+          <section>
+            <SectionHeading>Timeline</SectionHeading>
+            <div className="mt-4 [zoom:1.3]">
             <Timeline value={completedCount} className="w-full">
               {timelineItems.map((item, i) => (
                 <TimelineItem key={`${i}-${item.title}`} step={i + 1}>
@@ -298,86 +297,71 @@ export default function OrderDetailPage() {
                 </TimelineItem>
               ))}
             </Timeline>
-          </div>
+            </div>
+          </section>
         </div>
 
         <div className="space-y-6">
-          <Card title="Payment & payout">
-            <dl className="grid gap-3 text-sm">
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">Product</dt>
-                <dd className="font-medium tabular-nums">
+          <section>
+            <SectionHeading>Payment &amp; payout</SectionHeading>
+            <dl className="mt-2">
+              <Row label="Product">
+                <span className="tabular-nums">
                   <Amount value={order.amounts.product_kobo / 100} />
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-muted-foreground">Dispatch fee</dt>
-                <dd className="font-medium tabular-nums">
+                </span>
+              </Row>
+              <Row label="Dispatch fee">
+                <span className="tabular-nums">
                   <Amount value={order.amounts.dispatch_fee_kobo / 100} />
-                </dd>
-              </div>
-              <div className="flex items-center justify-between border-t border-dashed border-border/60 pt-3">
-                <dt className="font-medium">Total</dt>
-                <dd className="text-base font-semibold tabular-nums">
+                </span>
+              </Row>
+              <Row label="Total" strong>
+                <span className="tabular-nums">
                   <Amount value={order.amounts.total_kobo / 100} />
-                </dd>
-              </div>
-
-              <div className="border-t border-dashed border-border/60 pt-3">
-                <div className="flex items-center justify-between">
-                  <dt className="text-muted-foreground">Payment</dt>
-                  <dd className="font-medium">
-                    {order.payment?.paid_at ? "Paid" : "Not paid yet"}
-                  </dd>
-                </div>
-                <div className="mt-2 flex items-center justify-between">
-                  <dt className="text-muted-foreground">Reference</dt>
-                  <dd className="font-mono text-xs">
-                    {order.payment?.reference}
-                  </dd>
-                </div>
-                {order.payment?.paid_at && (
-                  <div className="mt-2 flex items-center justify-between">
-                    <dt className="text-muted-foreground">Paid at</dt>
-                    <dd className="text-xs">
-                      {formatDateTime(order.payment.paid_at)}
-                    </dd>
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t border-dashed border-border/60 pt-3">
-                <div className="flex items-center justify-between">
-                  <dt className="text-muted-foreground">Payout</dt>
-                  <dd className="font-medium capitalize">
-                    {order.payout?.status === "paid" && (
-                      <span className="text-primary">
-                        {order.payout.status}
-                      </span>
-                    )}
-                    {order.payout?.status === "frozen" && (
-                      <span className="text-destructive">
-                        {order.payout.status}
-                      </span>
-                    )}
-                    {(!order.payout?.status ||
-                      order.payout.status === "none" ||
-                      order.payout.status === "pending") && (
-                      <span className="text-muted-foreground">
-                        {order.payout?.status === "pending"
-                          ? "pending"
-                          : "not started"}
-                      </span>
-                    )}
-                  </dd>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Seller receives the product amount; dispatch fee goes to the
-                  logistics partner.
-                </p>
-              </div>
+                </span>
+              </Row>
+              <Row label="Payment">
+                {order.payment?.paid_at ? "Paid" : "Not paid yet"}
+              </Row>
+              <Row label="Reference">
+                <span className="font-mono text-xs">
+                  {order.payment?.reference}
+                </span>
+              </Row>
+              {order.payment?.paid_at && (
+                <Row label="Paid at">
+                  <span className="font-normal">
+                    {formatDateTime(order.payment.paid_at)}
+                  </span>
+                </Row>
+              )}
+              <Row label="Payout">
+                <span className="capitalize">
+                  {order.payout?.status === "paid" && (
+                    <span className="text-primary">{order.payout.status}</span>
+                  )}
+                  {order.payout?.status === "frozen" && (
+                    <span className="text-destructive">
+                      {order.payout.status}
+                    </span>
+                  )}
+                  {(!order.payout?.status ||
+                    order.payout.status === "none" ||
+                    order.payout.status === "pending") && (
+                    <span className="text-muted-foreground">
+                      {order.payout?.status === "pending"
+                        ? "pending"
+                        : "not started"}
+                    </span>
+                  )}
+                </span>
+              </Row>
             </dl>
-          </Card>
+            <p className="mt-2.5 text-xs text-muted-foreground">
+              Seller receives the product amount; dispatch fee goes to the
+              logistics partner.
+            </p>
+          </section>
         </div>
       </div>
     </div>
