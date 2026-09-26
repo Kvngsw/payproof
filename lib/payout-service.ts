@@ -1,26 +1,3 @@
-/**
- * lib/payout-service.ts — Payout split executor.
- *
- * WHY (two transfers): The dispatch fee is held in escrow alongside the
- * product price. When the buyer confirms delivery, we release two transfers:
- *   1. Product price → seller's settlement account
- *   2. Dispatch fee  → logistics partner account
- *
- * WHY (atomic claim lock): The payoutClaimedAt column is set before any
- * transfer fires. The updateMany({ where: { payoutClaimedAt: null } })
- * is an atomic check-and-set — only one request can claim it. A second
- * request (double-click, retry) hits 0 rows and is rejected.
- *
- * WHY (partial failure handling): If the second transfer (logistics) fails,
- * we record status='partial' and status='held' on the logistics payout row.
- * The UI shows "logistics fee held" — no silent success.
- *
- * WHY (unique transferRef): Each payout has a deterministic reference:
- *   payout_{orderId}_seller / payout_{orderId}_logistics
- * If the transfer succeeds but the DB write fails, re-sending the same
- * reference to Monnify is idempotent — they deduplicate by reference.
- */
-
 import db from './db';
 import { logger } from './logger';
 import { initiatePayout } from './monnify';
@@ -37,17 +14,9 @@ export interface PayoutStatus {
   }>;
 }
 
-/**
- * Release payouts for a Completed order.
- *
- * Guards:
- *   1. Order must be in Completed status
- *   2. No Disputed event in history (belt-and-braces check)
- *   3. payoutClaimedAt must be null (atomic idempotency guard)
- */
 export async function releasePayout(orderId: string): Promise<PayoutStatus> {
   return db.$transaction(async (tx) => {
-    // Load order with seller and payout history inside the transaction.
+
     const order = await tx.order.findUnique({
       where:   { id: orderId },
       include: {
@@ -60,31 +29,28 @@ export async function releasePayout(orderId: string): Promise<PayoutStatus> {
 
     if (!order) throw new Error(`Order ${orderId} not found`);
 
-    // Guard 1 — must be Completed
     if (order.status !== 'Completed') {
       throw new Error(`Order ${orderId} is not Completed (status: ${order.status})`);
     }
 
-    // Guard 2 — no Disputed event ever (belt-and-braces, spec §7.4)
-    if (order.orderEvents.length > 0) {
+    if (order.orderEvents.length > 0) { // belt-and-braces: scan history even though status gates first
       throw new PayoutFrozenError(orderId);
     }
 
-    // Guard 3 — atomic claim
     const claim = await tx.order.updateMany({
-      where: { id: orderId, payoutClaimedAt: null },
+      where: { id: orderId, payoutClaimedAt: null }, // atomic check-and-set: double-clicks and retries hit 0 rows
       data:  { payoutClaimedAt: new Date() },
     });
 
     if (claim.count === 0) {
       logger.info('Payout already claimed — idempotent no-op', { orderId });
-      // Return existing payout status
+
       return buildPayoutStatus(order.payouts);
     }
 
     const seller = order.seller;
     if (!seller?.settlementBank || !seller?.settlementNumber) {
-      // Release the claim so the seller can retry after adding settlement details.
+
       await tx.order.update({
         where: { id: orderId },
         data:  { payoutClaimedAt: null },
@@ -99,9 +65,8 @@ export async function releasePayout(orderId: string): Promise<PayoutStatus> {
     );
 
     const sellerRef     = `payout_${orderId}_seller`;
-    const logisticsRef  = `payout_${orderId}_logistics`;
+    const logisticsRef  = `payout_${orderId}_logistics`; // deterministic refs: Monnify dedupes by reference on retry
 
-    // ── Transfer 1: product price → seller ───────────────────────────────────
     let sellerTransfer: { status: string; reference: string };
     try {
       sellerTransfer = await initiatePayout({
@@ -114,7 +79,7 @@ export async function releasePayout(orderId: string): Promise<PayoutStatus> {
         sourceAccountNumber:      sourceAccount,
       });
     } catch (err) {
-      // First transfer failed — release the claim so a retry is possible.
+
       await tx.order.update({
         where: { id: orderId },
         data:  { payoutClaimedAt: null },
@@ -140,9 +105,6 @@ export async function releasePayout(orderId: string): Promise<PayoutStatus> {
       status: sellerTransfer.status,
     });
 
-    // ── Transfer 2: dispatch fee → logistics ──────────────────────────────────
-    // D6: if this fails, record as HELD with status='partial'. Don't roll
-    // back the seller transfer — the order is still Completed.
     const logisticsBankCode      = process.env.LOGISTICS_BANK_CODE!;
     const logisticsAccountNumber = process.env.LOGISTICS_ACCOUNT_NUMBER!;
     const logisticsAccountName   = process.env.LOGISTICS_ACCOUNT_NAME!;
@@ -162,7 +124,7 @@ export async function releasePayout(orderId: string): Promise<PayoutStatus> {
       });
       logisticsStatus = logisticsTransfer.status === 'SUCCESS' ? 'paid' : 'pending';
     } catch (err) {
-      // D6 fallback — logistics transfer failed, fee is HELD.
+
       logger.error('Logistics payout failed — fee held', { orderId, err });
       logisticsStatus = 'held';
     }
@@ -185,7 +147,6 @@ export async function releasePayout(orderId: string): Promise<PayoutStatus> {
       status: logisticsStatus,
     });
 
-    // Determine overall payout status
     const overallStatus =
       logisticsStatus === 'held' ? 'partial' : 'paid';
 

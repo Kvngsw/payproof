@@ -1,13 +1,3 @@
-/**
- * app/api/v1/health/route.ts — Health check endpoint (E23).
- *
- * WHY: Your deploy platform (Render, Railway, Vercel) needs to know if
- * your app is actually alive. This endpoint checks DB connectivity and
- * returns a 200 only if everything is healthy. 503 = something is down.
- *
- * Returns: { ok, version, rail, dbLatencyMs }
- */
-
 import { NextResponse } from 'next/server';
 import db              from '@/lib/db';
 import { logger }      from '@/lib/logger';

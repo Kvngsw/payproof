@@ -1,10 +1,3 @@
-/**
- * tests/split-payout.test.ts — QA-02.
- *
- * Invariant (§7.7): sellerKobo + logisticsKobo === totalKobo for every
- * input. No platform fee in MVP: seller gets exactly productKobo.
- */
-
 import { describe, it, expect } from 'vitest';
 import { splitPayout } from '../lib/order-service';
 

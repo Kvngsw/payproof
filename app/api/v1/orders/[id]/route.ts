@@ -1,14 +1,3 @@
-/**
- * app/api/v1/orders/[id]/route.ts — Full order detail (E14, polling target).
- *
- * GET — party only (buyer owner or seller owner, else 404 to avoid leaking
- * existence). Returns the spec §7.3 shape: status, product, seller +
- * reputation, amounts, delivery_days, tracking (with manual label),
- * payment (with verification_mode), payout, fraud_flag, events[].
- *
- * FE polls this every 5s (10s hidden tab) until a terminal state.
- */
-
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { getReputation } from '@/lib/reputation';
@@ -42,7 +31,6 @@ export async function GET(request: NextRequest, { params }: Params) {
       },
     });
 
-    // 404 for non-parties — same response as missing, no existence oracle.
     if (!order || (order.buyerId !== sub && order.sellerId !== sub)) {
       return notFound('Order');
     }
@@ -79,7 +67,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         status: order.trackingStatus,
         number: order.trackingNumber,
         source: order.trackingSource ?? 'manual',
-        // FE shows this label iff source === 'manual'. Never hardcoded in FE.
+
         label:
           (order.trackingSource ?? 'manual') === 'manual'
             ? 'Manually updated by seller'

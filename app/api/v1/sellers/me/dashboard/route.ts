@@ -1,10 +1,3 @@
-/**
- * app/api/v1/sellers/me/dashboard/route.ts — Seller dashboard (E07).
- *
- * GET — seller. `{ reserved_account, counts_by_status, payouts: {
- * pending_kobo, paid_kobo, frozen_kobo } }`.
- */
-
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { authenticate, getRequestId } from '@/lib/auth';

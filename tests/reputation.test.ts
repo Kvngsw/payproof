@@ -1,11 +1,3 @@
-/**
- * tests/reputation.test.ts — QA-02.
- *
- * Formula (D4, §7.8): score = completed / (completed + cancelled + disputed).
- * In-flight orders never touch the denominator. Zero history → null score +
- * "No history yet" badge. Badge thresholds are server-computed.
- */
-
 import { describe, it, expect } from 'vitest';
 import { computeScore, computeBadge } from '../lib/reputation';
 

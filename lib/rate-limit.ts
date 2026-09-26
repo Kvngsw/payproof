@@ -1,26 +1,4 @@
-/**
- * lib/rate-limit.ts — Rate limiting with dual backends.
- *
- * WHY: Without rate limiting, one script can destroy your server or spam
- * 10,000 people. One OTP request per email per 15 minutes. Ten login
- * attempts per IP per minute. No exceptions.
- *
- * Backend 1 — Upstash Redis: Required for production / serverless.
- *   The counter lives in Redis across all instances, not per-process memory.
- *
- * Backend 2 — In-memory Map: Local dev / single-process fallback.
- *   Resets on restart. DO NOT rely on in production serverless.
- *
- * Both backends expose the same surface: checkRateLimit / clientIp.
- * Route handlers never know which backend is active.
- *
- * Ported verbatim from PayProof 1.0 lib/rateLimit.js + TypeScript types.
- * Changed: prefix 'payproof-ratelimit' → 'pp2:' to isolate 2.0 counters.
- */
-
 import { logger } from './logger';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface RateLimitResult {
   allowed:      boolean;
@@ -28,15 +6,10 @@ export interface RateLimitResult {
   retryAfterMs: number;
 }
 
-// ── Backend selection ─────────────────────────────────────────────────────────
-
 const useUpstash =
   !!process.env.UPSTASH_REDIS_REST_URL &&
   !!process.env.UPSTASH_REDIS_REST_TOKEN;
 
-// ── Upstash backend ───────────────────────────────────────────────────────────
-
-// Lazy-loaded to avoid import errors when Upstash vars are not set.
 let _redis: import('@upstash/redis').Redis | null = null;
 
 async function getRedis(): Promise<import('@upstash/redis').Redis> {
@@ -75,8 +48,6 @@ async function upstashCheck(key: string, limit: number, windowMs: number): Promi
   };
 }
 
-// ── In-memory backend ─────────────────────────────────────────────────────────
-
 interface Bucket { count: number; resetAt: number }
 const _memStore = new Map<string, Bucket>();
 
@@ -97,24 +68,15 @@ function checkMemory(key: string, limit: number, windowMs: number): RateLimitRes
   return { allowed, remaining, retryAfterMs };
 }
 
-// Prune expired buckets every 10 minutes to prevent unbounded memory growth.
 const pruneTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, bucket] of _memStore) {
     if (now >= bucket.resetAt) _memStore.delete(key);
   }
-}, 10 * 60 * 1_000);
+}, 10 * 60 * 1_000); // cap memory growth from dead buckets
 
-// Allow Node to exit even if this timer is still pending.
 pruneTimer.unref?.();
 
-// ── Public surface ────────────────────────────────────────────────────────────
-
-/**
- * Check whether `key` has exceeded `limit` requests in `windowMs` milliseconds.
- *
- * Fails open on Redis errors — a Redis outage must not turn into an auth outage.
- */
 export async function checkRateLimit(
   key: string,
   limit: number,
@@ -124,21 +86,17 @@ export async function checkRateLimit(
     try {
       return await upstashCheck(key, limit, windowMs);
     } catch (err) {
-      // Fail open — log and allow so Redis downtime ≠ site downtime.
+
       logger.error('rateLimit: Upstash failed, allowing request', {
         err: err instanceof Error ? err : new Error(String(err)),
         key,
       });
-      return { allowed: true, remaining: limit, retryAfterMs: 0 };
+      return { allowed: true, remaining: limit, retryAfterMs: 0 }; // a Redis outage must never become an auth outage
     }
   }
   return checkMemory(key, limit, windowMs);
 }
 
-/**
- * Extract the real client IP from reverse-proxy headers.
- * x-forwarded-for may contain a comma-separated chain — we want the first.
- */
 export function clientIp(request: Request): string {
   return (
     request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??

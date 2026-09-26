@@ -1,54 +1,18 @@
-/**
- * lib/monnify.ts — Monnify rail adapter (RailProvider implementation).
- *
- * WHY (rail-agnostic interface): The interface decouples business logic
- * from the payment provider. If Monnify goes down during the demo, we can
- * swap to a backup without touching a single order or webhook handler.
- *
- * WHY (kobo↔naira boundary): Integer money (kobo) is used throughout the
- * API and database. Floating point arithmetic is fundamentally broken for
- * exact values. This file is the ONLY place where conversion between kobo
- * (our internal unit) and naira (Monnify's API unit) happens.
- *
- * WHY (singleflight token cache): Monnify tokens last ~60 minutes. Without
- * caching, every request fires an auth call. Singleflight ensures that if
- * 100 concurrent requests arrive while the token is expired, only one
- * auth call goes out — the other 99 wait and reuse the result.
- *
- * WHY (timing-safe HMAC): crypto.timingSafeEqual prevents timing attacks
- * where an attacker sends partial signatures and measures response time to
- * reconstruct the full HMAC.
- *
- * Rewritten from PayProof 1.0 lib/monnifyClient.js:
- *   - Removed ALL console.log (they leaked BVN + amounts)
- *   - Kobo↔naira conversion centralised here only
- *   - Zod schemas validate every Monnify API response
- *   - initializeTransaction added (was missing from spec)
- *   - verifyTransaction returns amountKobo (not amountNaira)
- */
-
 import crypto from 'crypto';
 import { z }  from 'zod';
 import { logger } from './logger';
 import { RailError, RailTimeoutError } from './errors';
 
-// ── Config ────────────────────────────────────────────────────────────────────
-
 const BASE_URL = () =>
   process.env.MONNIFY_BASE_URL ?? 'https://sandbox.monnify.com';
 
-// ── Money conversion — lives ONLY in this file ────────────────────────────────
-
-/** Monnify API uses naira. We store/send kobo. Convert at the boundary. */
 function koboToNaira(kobo: number): number {
-  return kobo / 100;
+  return kobo / 100; // the single conversion point: Monnify speaks naira, we speak kobo
 }
 
 function nairaToKobo(naira: number | string): number {
   return Math.round(Number(naira) * 100);
 }
-
-// ── Zod schemas for Monnify API responses ─────────────────────────────────────
 
 const TokenResponseSchema = z.object({
   responseBody: z.object({
@@ -72,8 +36,7 @@ const ReservedAccountSchema = z.object({
 
 const TransactionQuerySchema = z.object({
   responseBody: z.object({
-    // Unpaid transactions return nulls — schema reflects the real rail,
-    // and the code below treats null status/amount as "not paid".
+
     paymentStatus: z.string().nullable().optional(),
     amountPaid: z.union([z.string(), z.number()]).nullable().optional(),
     currencyCode: z.string().nullable().optional(),
@@ -104,8 +67,6 @@ const BankValidationSchema = z.object({
     bankCode:      z.string(),
   }),
 });
-
-// ── Interfaces (rail-agnostic contract) ───────────────────────────────────────
 
 export interface ReservedAccount {
   accountNumber: string;
@@ -147,8 +108,6 @@ export interface BankValidation {
   bankCode:      string;
 }
 
-// ── Token cache (singleflight) ────────────────────────────────────────────────
-
 interface TokenCache { token: string; expiresAt: number }
 let _tokenCache: TokenCache | null   = null;
 let _tokenPromise: Promise<string> | null = null;
@@ -161,8 +120,7 @@ export async function getToken(): Promise<string> {
     return _tokenCache.token;
   }
 
-  // Singleflight — if a refresh is already in flight, wait for it.
-  if (_tokenPromise) {
+  if (_tokenPromise) { // one refresh at a time: 100 concurrent expiries = 1 auth call
     return _tokenPromise;
   }
 
@@ -193,7 +151,6 @@ export async function getToken(): Promise<string> {
     const data   = TokenResponseSchema.parse(await response.json());
     const token  = data.responseBody.accessToken;
 
-    // Cache with 5-minute buffer before expiry (tokens last ~60 minutes).
     _tokenCache = { token, expiresAt: now + 55 * 60 * 1_000 };
 
     logger.info('Monnify access token refreshed', {
@@ -210,12 +167,6 @@ export async function getToken(): Promise<string> {
   }
 }
 
-// ── Rail functions ────────────────────────────────────────────────────────────
-
-/**
- * Create a Monnify reserved account for a seller at registration.
- * The account_number is what buyers use to pay directly.
- */
 export async function createReservedAccount(params: {
   userId:   string | number;
   name:     string;
@@ -271,7 +222,7 @@ export async function createReservedAccount(params: {
   logger.info('Monnify reserved account created', {
     userId:  params.userId,
     bank:    first.bankName,
-    // Log only last 4 digits — no secrets in logs
+
     number:  `••••${first.accountNumber.slice(-4)}`,
     name:    acct.accountName,
   });
@@ -283,11 +234,6 @@ export async function createReservedAccount(params: {
   };
 }
 
-/**
- * Initialise a Monnify hosted checkout for a buyer.
- * Returns a checkoutUrl to redirect the buyer to, and a reference
- * that Monnify sends back in the webhook (our payment reference).
- */
 export async function initializeTransaction(order: {
   ref:          string;
   totalKobo:    number;
@@ -304,7 +250,7 @@ export async function initializeTransaction(order: {
     amount:             koboToNaira(order.totalKobo),
     customerName:       order.buyerEmail,
     customerEmail:      order.buyerEmail,
-    paymentReference:   order.ref,              // YOUR ref — Monnify echoes this in webhook
+    paymentReference:   order.ref,
     paymentDescription: `PayProof order: ${order.productName}`,
     currencyCode:       'NGN',
     contractCode,
@@ -337,15 +283,6 @@ export async function initializeTransaction(order: {
   };
 }
 
-/**
- * Server-side transaction verification.
- *
- * WHY: Never trust the webhook body alone. We always call back to Monnify
- * to confirm the payment status. This prevents spoofed webhooks from
- * marking orders as paid.
- *
- * Returns amountKobo — conversion from naira happens here only.
- */
 export async function verifyTransaction(
   transactionReference: string,
 ): Promise<VerifiedTransaction> {
@@ -359,7 +296,7 @@ export async function verifyTransaction(
   let response: Response;
   try {
     const controller = new AbortController();
-    const timeout    = setTimeout(() => controller.abort(), 8_000);
+    const timeout    = setTimeout(() => controller.abort(), 8_000); // hanging rails must not hang requests
     response = await fetch(url.toString(), {
       method:  'GET',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -384,14 +321,12 @@ export async function verifyTransaction(
   const data = TransactionQuerySchema.parse(raw);
   const r    = data.responseBody;
 
-  // Null status/amount (unpaid or rail drift) degrades to "not paid" —
-  // the caller takes the mismatch path, never a crash-retry loop.
   const amountKobo = r.amountPaid == null ? 0 : nairaToKobo(r.amountPaid);
 
   logger.info('Monnify transaction verified', {
     transactionReference,
     paymentStatus: r.paymentStatus,
-    // Log amount in kobo — no floats in logs
+
     amountKobo,
   });
 
@@ -404,10 +339,6 @@ export async function verifyTransaction(
   };
 }
 
-/**
- * Initiate a bank transfer (payout).
- * amountKobo is converted to naira here — the ONLY conversion point.
- */
 export async function initiatePayout(params: PayoutParams): Promise<PayoutResult> {
   const token = await getToken();
 
@@ -431,7 +362,7 @@ export async function initiatePayout(params: PayoutParams): Promise<PayoutResult
 
   logger.debug('Initiating Monnify payout', {
     reference: params.reference,
-    // Log only last 4 digits — no account numbers in logs
+
     destination: `••••${params.destinationAccountNumber.slice(-4)}`,
     amountKobo: params.amountKobo,
   });
@@ -465,10 +396,6 @@ export async function initiatePayout(params: PayoutParams): Promise<PayoutResult
   };
 }
 
-/**
- * Validate a bank account before storing settlement details.
- * In sandbox, returns a stub — the real API requires live Monnify credentials.
- */
 export async function validateBankAccount(
   bankCode:      string,
   accountNumber: string,
@@ -499,22 +426,10 @@ export async function validateBankAccount(
   return data.responseBody;
 }
 
-/** True when MONNIFY_BASE_URL points at the sandbox environment. */
 export function isSandbox(): boolean {
   return BASE_URL().includes('sandbox');
 }
 
-/**
- * Verify the HMAC-SHA512 webhook signature from Monnify.
- *
- * WHY (timingSafeEqual): Regular string comparison short-circuits on the
- * first differing character. An attacker can measure response time to
- * reconstruct the HMAC byte by byte. timingSafeEqual always takes the
- * same time regardless of how many bytes match.
- *
- * Sandbox mode: Monnify doesn't send a signature header. We skip
- * verification in sandbox and enforce it in production.
- */
 export function verifyWebhookSignature(rawBody: string, signature: string): boolean {
   const secretKey = process.env.MONNIFY_SECRET_KEY;
   if (!secretKey) {
@@ -527,12 +442,12 @@ export function verifyWebhookSignature(rawBody: string, signature: string): bool
     .digest('hex');
 
   try {
-    return crypto.timingSafeEqual(
+    return crypto.timingSafeEqual( // constant-time: response time must not leak signature bytes
       Buffer.from(expected,  'hex'),
       Buffer.from(signature, 'hex'),
     );
   } catch {
-    // Buffer.from throws if signature is not valid hex — treat as no match.
+
     return false;
   }
 }

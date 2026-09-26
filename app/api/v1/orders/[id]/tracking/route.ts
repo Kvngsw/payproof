@@ -1,10 +1,3 @@
-/**
- * app/api/v1/orders/[id]/tracking/route.ts — Update tracking (E18).
- *
- * PATCH — seller (owner). Forward-only tracking statuses; setting `Delivered`
- * also moves the order `Shipped → Delivered`. Anything else → order untouched.
- */
-
 import { z } from 'zod';
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
@@ -24,7 +17,6 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-// Forward-only ladder — index must strictly increase.
 const LADDER = ['Picked Up', 'In Transit', 'Out for Delivery', 'Delivered'] as const;
 
 const BodySchema = z.object({
@@ -62,7 +54,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const nextIdx = LADDER.indexOf(parsed.data.tracking_status);
     const curIdx = order.trackingStatus ? LADDER.indexOf(order.trackingStatus as (typeof LADDER)[number]) : -1;
 
-    if (nextIdx <= curIdx) {
+    if (nextIdx <= curIdx) { // forward-only: history must read as progress
       return badRequest(
         `Tracking cannot move backwards (${order.trackingStatus} → ${parsed.data.tracking_status}).`,
       );
@@ -78,7 +70,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         },
       });
 
-      // Seller marking Delivered advances the order too (claim, D2).
       if (parsed.data.tracking_status === 'Delivered' && order.status === 'Shipped') {
         await transition(order.id, 'Delivered', 'seller', 'Tracking marked Delivered by seller', tx);
       }

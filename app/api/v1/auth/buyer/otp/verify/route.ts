@@ -1,18 +1,3 @@
-/**
- * app/api/v1/auth/buyer/otp/verify/route.ts — Buyer OTP verification (E04).
- *
- * POST body: { email, code }
- * Response 200: { token, buyer: { id, email } }
- *
- * Security:
- *   ✓ Rate limiting per email (5 attempts before lockout)
- *   ✓ Max 5 attempts per OTP code — increment tracked in DB
- *   ✓ OTP expiry enforced (10 minutes)
- *   ✓ bcrypt comparison (not plain string comparison)
- *   ✓ usedAt set atomically on first use
- *   ✓ httpOnly refresh cookie issued on success
- */
-
 import bcrypt from 'bcrypt';
 import { z }  from 'zod';
 import { NextRequest } from 'next/server';
@@ -46,7 +31,6 @@ export async function POST(request: NextRequest) {
     const { email, code } = parsed.data;
     const cleanEmail = email.toLowerCase();
 
-    // ── Rate limit per email ───────────────────────────────────────────────
     const { allowed, retryAfterMs } = await checkRateLimit(
       `otp:verify:${cleanEmail}`,
       10,
@@ -56,7 +40,6 @@ export async function POST(request: NextRequest) {
       return tooManyRequestsResponse(retryAfterMs);
     }
 
-    // ── Find most recent valid OTP ─────────────────────────────────────────
     const otpRecord = await db.otpCode.findFirst({
       where: {
         email:  cleanEmail,
@@ -69,23 +52,19 @@ export async function POST(request: NextRequest) {
       return badRequest('No pending OTP found. Please request a new code.', 'OTP_EXPIRED');
     }
 
-    // ── Check max attempts ─────────────────────────────────────────────────
     if (otpRecord.attempts >= OTP_MAX_ATTEMPTS) {
       throw new OtpMaxAttemptsError();
     }
 
-    // ── Check expiry ───────────────────────────────────────────────────────
     if (new Date() > otpRecord.expiresAt) {
       throw new OtpExpiredError();
     }
 
-    // ── Increment attempt counter before comparing ─────────────────────────
     await db.otpCode.update({
       where: { id: otpRecord.id },
-      data:  { attempts: { increment: 1 } },
+      data:  { attempts: { increment: 1 } }, // count before comparing: no unlimited guesses
     });
 
-    // ── bcrypt comparison ──────────────────────────────────────────────────
     const match = await bcrypt.compare(code, otpRecord.codeHash);
 
     if (!match) {
@@ -97,13 +76,11 @@ export async function POST(request: NextRequest) {
       return badRequest('Invalid code. Please try again or request a new one.', 'VALIDATION');
     }
 
-    // ── Mark OTP as used ───────────────────────────────────────────────────
     await db.otpCode.update({
       where: { id: otpRecord.id },
       data:  { usedAt: new Date() },
     });
 
-    // ── Upsert buyer ───────────────────────────────────────────────────────
     const buyer = await db.buyer.upsert({
       where:  { email: cleanEmail },
       update: {},

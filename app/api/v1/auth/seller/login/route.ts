@@ -1,17 +1,3 @@
-/**
- * app/api/v1/auth/seller/login/route.ts — Seller login (E02).
- *
- * POST body: { email, password }
- * Response 200: { token, seller, reserved_account }
- *
- * Security:
- *   ✓ Rate limiting (10/60s per IP+email)
- *   ✓ Zod validation
- *   ✓ Timing-safe dummy hash on login miss — prevents user enumeration
- *   ✓ httpOnly refresh cookie
- *   ✓ No user existence info in error response
- */
-
 import bcrypt from 'bcrypt';
 import { z }  from 'zod';
 import { NextRequest } from 'next/server';
@@ -32,7 +18,6 @@ export async function POST(request: NextRequest) {
   const requestId = getRequestId(request);
   const ip        = clientIp(request);
 
-  // ── Rate limit: 10 attempts per IP per minute ──────────────────────────────
   const { allowed, retryAfterMs } = await checkRateLimit(`login:${ip}`, 10, 60_000);
   if (!allowed) {
     logger.warn('Login rate limit exceeded', { ip, requestId });
@@ -52,15 +37,11 @@ export async function POST(request: NextRequest) {
 
     const seller = await db.seller.findUnique({ where: { email: cleanEmail } });
 
-    // ── Timing-safe comparison ─────────────────────────────────────────────
-    // WHY: Run bcrypt.compare even when seller is null (against DUMMY_HASH).
-    // This ensures response time is identical whether the email exists or not.
-    // Prevents timing oracle that reveals which emails are registered.
     let match = false;
     try {
-      match = await bcrypt.compare(password, seller?.passwordHash ?? DUMMY_HASH);
+      match = await bcrypt.compare(password, seller?.passwordHash ?? DUMMY_HASH); // same cost on miss: identical timing whether the email exists
     } catch {
-      // bcrypt throws on malformed hash — treat as no match.
+
     }
 
     if (!seller || !match) {
@@ -68,7 +49,7 @@ export async function POST(request: NextRequest) {
         email: cleanEmail,
         requestId,
       });
-      // Same message regardless of whether email exists — no enumeration.
+
       return unauthorized('Invalid email or password.');
     }
 

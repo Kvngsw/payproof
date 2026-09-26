@@ -1,13 +1,3 @@
-/**
- * app/api/v1/auth/me/route.ts — Current session profile (E05).
- *
- * GET with `Authorization: Bearer <access>`.
- * Response: `{ role, profile }` — role-scoped, never leaks secrets:
- *   - seller: id, name, businessName, email, phone, reserved_account (no
- *     passwordHash, no bvnHash, no settlement details)
- *   - buyer: id, email
- */
-
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -41,7 +31,7 @@ export async function GET(request: NextRequest) {
       });
 
       if (!seller) {
-        // Token valid but seller deleted — force re-login.
+
         logger.warn('me: seller not found for valid token', { sub: claims.sub, requestId });
         return unauthorized('Session expired. Please log in again.');
       }

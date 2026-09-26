@@ -1,11 +1,3 @@
-/**
- * app/api/v1/sellers/[id]/route.ts — Public seller profile + reputation (E06).
- *
- * GET — public. `{ id, business_name, reputation: { score, completed, total,
- * badge } }`. Reputation is computed live from real order history — never
- * hardcoded, never cached (spec INT-05).
- */
-
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { getReputation } from '@/lib/reputation';

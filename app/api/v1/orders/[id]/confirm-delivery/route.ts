@@ -1,11 +1,3 @@
-/**
- * app/api/v1/orders/[id]/confirm-delivery/route.ts — Buyer confirms (E19).
- *
- * POST — buyer (owner). `Delivered → Completed`, or atomically
- * `Shipped → Delivered → Completed` (two events). Triggers `releasePayout()`
- * — the dual transfer (product → seller, dispatch → logistics).
- */
-
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -45,9 +37,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       return notFound('Order');
     }
 
-    // E19 shortcut: Shipped → Delivered → Completed atomically.
     await db.$transaction(async (tx) => {
-      if (order.status === 'Shipped') {
+      if (order.status === 'Shipped') { // E19 shortcut: two transitions, one atomic txn
         await transition(order.id, 'Delivered', 'buyer', 'Buyer confirmed from Shipped', tx);
       }
       await transition(order.id, 'Completed', 'buyer', 'Buyer confirmed delivery', tx);
@@ -55,7 +46,6 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     logger.info('Order completed by buyer', { orderId: order.id, requestId });
 
-    // Release dual payout OUTSIDE the state txn (external rail calls).
     const payout = await releasePayout(order.id);
 
     return ok({ id: order.id, status: 'Completed', payout });

@@ -1,17 +1,3 @@
-/**
- * app/api/v1/auth/refresh/route.ts — Rotate refresh token (E05 companion).
- *
- * POST, no body. Reads `pp_refresh` httpOnly cookie, verifies it, and issues
- * a fresh access (15m) + refresh (7d) pair. The new refresh cookie overwrites
- * the old one — rotation invalidates the previous token implicitly since only
- * the newest cookie value is stored client-side.
- *
- * Security:
- *   ✓ Refresh token never touches JS (httpOnly cookie, Path-scoped)
- *   ✓ Same generic 401 whether cookie missing, expired, or forged
- *   ✓ Rate limited per IP (30/min — refresh is cheap but abusable)
- */
-
 import { NextRequest } from 'next/server';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, clientIp } from '@/lib/rate-limit';
@@ -40,7 +26,7 @@ export async function POST(request: NextRequest) {
     const claims = extractRefreshToken(request);
 
     if (!claims) {
-      // Missing, expired, or forged — same response, no oracle.
+
       const res = unauthorized('Session expired. Please log in again.');
       res.headers.set('Set-Cookie', clearRefreshCookieHeader());
       return res;

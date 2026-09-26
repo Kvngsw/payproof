@@ -1,18 +1,9 @@
-/**
- * lib/seed.ts — Demo seed script (INT-03).
- *
- * Creates 2 sellers × 5 products + 8–10 historical orders each (mixed
- * Completed/Cancelled) as REAL rows — reputation and fraud queries run
- * against them exactly like live data. Rerunnable: wipes prior seed rows
- * by email before recreating. Run: `npx tsx lib/seed.ts`
- */
-
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import db from './db';
 import { logger } from './logger';
 
-const SEED_PASSWORD = 'SeedPassword123!';
+const SEED_PASSWORD = 'SeedPassword123!'; // demo logins; production seeds use generated secrets
 
 const SELLERS = [
   {
@@ -46,7 +37,6 @@ const SELLERS = [
 async function main() {
   logger.info('Seed starting — wiping prior seed rows');
 
-  // Rerunnable: remove previous seed data by seller email.
   const emails = SELLERS.map((s) => s.email);
   const oldSellers = await db.seller.findMany({ where: { email: { in: emails } }, select: { id: true } });
   const oldIds = oldSellers.map((s) => s.id);
@@ -61,7 +51,6 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(SEED_PASSWORD, 12);
 
-  // Seed buyer for historical orders.
   const buyer = await db.buyer.upsert({
     where: { email: 'tobi@payproof.ng' },
     update: {},
@@ -103,8 +92,7 @@ async function main() {
       );
     }
 
-    // 9 historical orders: 6 Completed, 3 Cancelled (non-trivial reputation).
-    const history: Array<'Completed' | 'Cancelled'> = [
+    const history: Array<'Completed' | 'Cancelled'> = [ // 70/30 split: non-trivial reputation, honest mix
       'Completed', 'Completed', 'Completed', 'Completed', 'Completed', 'Completed',
       'Cancelled', 'Cancelled', 'Cancelled',
     ];

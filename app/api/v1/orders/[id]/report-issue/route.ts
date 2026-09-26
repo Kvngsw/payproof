@@ -1,10 +1,3 @@
-/**
- * app/api/v1/orders/[id]/report-issue/route.ts — Buyer reports issue (E20).
- *
- * POST — buyer (owner). `{ reason }` required (≤500 chars).
- * `Shipped|Delivered → Disputed`. Terminal in MVP (D5) — payout frozen.
- */
-
 import { z } from 'zod';
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';

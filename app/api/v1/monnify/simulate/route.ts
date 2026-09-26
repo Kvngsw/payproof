@@ -1,16 +1,3 @@
-/**
- * app/api/v1/monnify/simulate/route.ts — Sandbox payment simulator.
- *
- * POST — sandbox only (`isSandbox()` AND `NODE_ENV !== 'production'`).
- * Body: `{ payment_reference }` (OUR ref from order creation).
- *
- * Advances a PendingPayment order to Paid → AwaitingShipment WITHOUT calling
- * Monnify, using the same `transition()` / `decrementStock()` / fraud
- * primitives as the real webhook. Every event is tagged SIMULATED and the
- * payment row records `verificationMode: 'live-simulated'` — rehearsal and
- * rail-spike tool, never a silent fake in production.
- */
-
 import { z } from 'zod';
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
@@ -41,7 +28,7 @@ export async function POST(request: NextRequest) {
   const requestId = getRequestId(request);
 
   try {
-    if (!isSandbox() || env.NODE_ENV === 'production') {
+    if (!isSandbox() || env.NODE_ENV === 'production') { // rehearsal tool only: must never exist in production
       return forbidden('Simulator is sandbox-only.');
     }
 

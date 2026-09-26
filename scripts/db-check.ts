@@ -1,7 +1,3 @@
-/**
- * scripts/db-check.ts — Live DB verification (reputation + counts).
- * Run: npx tsx --env-file=.env.local scripts/db-check.ts
- */
 import db from '../lib/db';
 import { getReputation } from '../lib/reputation';
 

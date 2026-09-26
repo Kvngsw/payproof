@@ -1,18 +1,6 @@
-/**
- * scripts/webhook-check.ts — Phase A webhook proof (localhost).
- * Genuine handler path with a REAL Monnify transactionReference (PENDING):
- *   T1 mismatch → stays PendingPayment + exactly 1 PAYMENT_MISMATCH event
- *   T2 replay same payload → 200, event count unchanged (dedup)
- *   T3 unknown paymentReference → 200-ignore
- *   T4 malformed body → 200 (no retry storm)
- * Full PAID-via-webhook awaits Phase B (real sandbox payment).
- * Run against dev server: npx tsx --env-file=.env.local scripts/webhook-check.ts
- */
 import db from '../lib/db';
 
 const BASE = 'http://localhost:3000/api/v1';
-// Real spike transaction: Monnify reports PENDING, amount null → mismatch path.
-const REAL_PENDING_REF = 'MNFY|09|20260926082350|000246';
 
 let pass = 0;
 let fail = 0;
@@ -58,16 +46,18 @@ async function main() {
   const orderId = order.id;
   const ourRef = payment.reference;
 
+  const payRow = await db.payment.findFirst({ where: { orderId } });
+  const liveRef = payRow?.providerRef;
+  if (!liveRef) throw new Error('payment row missing providerRef');
   const payload = {
     eventType: 'SUCCESSFUL_TRANSACTION',
     eventData: {
-      transactionReference: REAL_PENDING_REF,
+      transactionReference: liveRef,
       paymentReference: ourRef,
       amountPaid: product.priceKobo + product.dispatchFeeKobo,
     },
   };
 
-  // T1: genuine handler run — server-side verify says PENDING → mismatch.
   const t1 = await fetch(BASE + '/monnify/webhook', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -83,7 +73,6 @@ async function main() {
   check('T1 exactly 1 PAYMENT_MISMATCH event', mismatchEvents.length === 1, `got ${mismatchEvents.length}`);
   check('T1 payment row untouched (still pending)', after!.payments[0].status === 'pending');
 
-  // T2: replay — dedup short-circuits, no duplicate event.
   const t2 = await fetch(BASE + '/monnify/webhook', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -96,7 +85,6 @@ async function main() {
   const mismatchAfter = afterReplay!.orderEvents.filter((e) => (e.note ?? '').includes('PAYMENT_MISMATCH'));
   check('T2 replay 200 + no duplicate event', t2.status === 200 && mismatchAfter.length === 1);
 
-  // T3: unknown reference → 200-ignore.
   const t3 = await fetch(BASE + '/monnify/webhook', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -107,7 +95,6 @@ async function main() {
   });
   check('T3 unknown ref 200-ignore', t3.status === 200);
 
-  // T4: malformed body → 200 (no retry storm).
   const t4 = await fetch(BASE + '/monnify/webhook', {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },

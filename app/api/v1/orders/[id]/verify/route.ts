@@ -1,13 +1,3 @@
-/**
- * app/api/v1/orders/[id]/verify/route.ts — Buyer-triggered live verify (E15).
- *
- * POST — buyer (owner). Calls Monnify server-side. If the order is still
- * PendingPayment but the rail says PAID with the exact amount, advances it
- * (closes the webhook race). On rail timeout + `DEMO_FALLBACK=true`, falls
- * back to cached DB state and marks `verification_mode='cached_fallback'`
- * (FE shows the honesty banner — never silent).
- */
-
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -40,7 +30,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!claims) return unauthorized();
     if (claims.role !== 'buyer') return forbidden('Only the buyer can verify this order.');
 
-    // Tightest budget: every pass-through can hit Monnify billable latency.
     const { allowed, retryAfterMs } = await checkRateLimit(`act:verify:${claims.sub}`, 10, 60_000);
     if (!allowed) return tooManyRequestsResponse(retryAfterMs);
 
@@ -56,19 +45,17 @@ export async function POST(request: NextRequest, { params }: Params) {
     const payment = order.payments[0];
     if (!payment) return notFound('Payment');
 
-    // Already settled — nothing to verify.
     if (order.status !== 'PendingPayment') {
       return ok({ id: order.id, status: order.status, verification_mode: payment.verificationMode });
     }
 
     let verified: Awaited<ReturnType<typeof verifyTransaction>>;
     try {
-      // providerRef = Monnify's transaction ref (verify key). Fall back to
-      // ours for rows created before providerRef existed.
+
       verified = await verifyTransaction(payment.providerRef ?? payment.reference);
     } catch (err) {
-      // Disclosed fallback (B6): cached DB state + banner, never silent success.
-      if (err instanceof RailTimeoutError && env.DEMO_FALLBACK) {
+
+      if (err instanceof RailTimeoutError && env.DEMO_FALLBACK) { // disclosed fallback: cached state plus banner, never silent success
         await db.payment.update({
           where: { id: payment.id },
           data: { verificationMode: 'cached_fallback' },
@@ -100,7 +87,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       });
     }
 
-    // Live PAID + exact amount → advance (same primitives as the webhook).
     await db.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: payment.id },

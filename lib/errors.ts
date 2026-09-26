@@ -1,20 +1,3 @@
-/**
- * lib/errors.ts — Typed error hierarchy.
- *
- * WHY: `throw new Error('something broke')` tells you nothing at 2am.
- * Every business-rule violation gets its own class so:
- *   1. Route handlers can catch by type, not by string matching
- *   2. HTTP status codes are co-located with the error definition
- *   3. API error codes are spec-exact (§7.1)
- *
- * Usage in a route:
- *   try { ... }
- *   catch (err) {
- *     if (err instanceof InvalidTransitionError) return appError(err);
- *     return serverError(err, ctx, requestId);
- *   }
- */
-
 export type ErrorCode =
   | 'VALIDATION'
   | 'UNAUTHENTICATED'
@@ -32,7 +15,6 @@ export type ErrorCode =
   | 'OTP_MAX_ATTEMPTS'
   | 'INTERNAL_ERROR';
 
-/** Base class for all PayProof domain errors. */
 export class AppError extends Error {
   constructor(
     public readonly code: ErrorCode,
@@ -42,12 +24,10 @@ export class AppError extends Error {
   ) {
     super(message);
     this.name = this.constructor.name;
-    // Ensure instanceof checks work after transpilation.
+
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
-
-// ── Auth errors ───────────────────────────────────────────────────────────────
 
 export class UnauthenticatedError extends AppError {
   constructor(message = 'Authentication required.') {
@@ -67,8 +47,6 @@ export class BadSignatureError extends AppError {
   }
 }
 
-// ── Validation / not-found ────────────────────────────────────────────────────
-
 export class ValidationError extends AppError {
   constructor(message: string, details?: Record<string, unknown>) {
     super('VALIDATION', message, 400, details);
@@ -87,8 +65,6 @@ export class DuplicateError extends AppError {
   }
 }
 
-// ── Order / state machine ─────────────────────────────────────────────────────
-
 export class InvalidTransitionError extends AppError {
   constructor(from: string, to: string) {
     super(
@@ -106,8 +82,6 @@ export class OutOfStockError extends AppError {
   }
 }
 
-// ── Payout ────────────────────────────────────────────────────────────────────
-
 export class PayoutFrozenError extends AppError {
   constructor(orderId: string) {
     super(
@@ -118,8 +92,6 @@ export class PayoutFrozenError extends AppError {
     );
   }
 }
-
-// ── OTP ───────────────────────────────────────────────────────────────────────
 
 export class OtpExpiredError extends AppError {
   constructor() {
@@ -132,8 +104,6 @@ export class OtpMaxAttemptsError extends AppError {
     super('OTP_MAX_ATTEMPTS', 'Too many OTP attempts. Request a new code.', 429);
   }
 }
-
-// ── Rail / external ───────────────────────────────────────────────────────────
 
 export class RailError extends AppError {
   constructor(message: string, details?: Record<string, unknown>) {

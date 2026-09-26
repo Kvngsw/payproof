@@ -1,34 +1,14 @@
-/**
- * lib/reputation.ts — Real seller reputation computation.
- *
- * WHY: Never hardcode, never mock, never cache stale.
- * The reputation score is computed from real order history via a single
- * aggregation SQL query. It recomputes whenever called — no in-memory cache.
- *
- * Formula (D4 ruling from spec §7.8):
- *   score = completed / (completed + cancelled + disputed)
- *   badge = computed server-side from score
- *
- * This is the D4 version (recommended) rather than the spec-literal version
- * (which counts all orders including in-flight, distorting the badge).
- */
-
 import db from './db';
 
 export interface ReputationResult {
-  score:     number | null;   // null = no history
+  score:     number | null;
   completed: number;
   total:     number;
   badge:     string;
 }
 
-/**
- * Compute reputation for a seller.
- * Uses a single aggregation query — no N+1, no loops.
- */
 export async function getReputation(sellerId: string): Promise<ReputationResult> {
-  // Raw SQL aggregation for performance and spec-exact semantics.
-  // Prisma's groupBy doesn't support FILTER clauses, so we use $queryRaw.
+
   const rows = await db.$queryRaw<
     Array<{
       completed: bigint;
@@ -65,20 +45,12 @@ export async function getReputation(sellerId: string): Promise<ReputationResult>
   };
 }
 
-/**
- * Pure score computation — unit tested without a database.
- * Denominator = terminal states only (D4 ruling, spec §7.8).
- */
-export function computeScore(completed: number, total: number): number | null {
+export function computeScore(completed: number, total: number): number | null { // D4: terminal states only — in-flight orders must not dent the badge
   if (total === 0) return null;
   return completed / total;
 }
 
-/**
- * Compute a human-readable badge from the score.
- * Badge thresholds are server-computed — never hardcoded on the client.
- */
-export function computeBadge(score: number | null, total: number): string {
+export function computeBadge(score: number | null, total: number): string { // server-computed: clients never decide badges
   if (score === null || total === 0) return 'No history yet';
   const pct = Math.round(score * 100);
   if (pct >= 95) return `${pct}% completed`;

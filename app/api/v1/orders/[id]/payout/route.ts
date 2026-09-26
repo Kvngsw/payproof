@@ -1,11 +1,3 @@
-/**
- * app/api/v1/orders/[id]/payout/route.ts — Payout status view (E21).
- *
- * GET — party only. `{ status, product_kobo, dispatch_kobo, transfers: [{
- * to, amount_kobo, status, ref }] }`. `status`: none | pending | paid |
- * frozen | partial | failed. Disputed orders report `frozen`.
- */
-
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { authenticate, getRequestId } from '@/lib/auth';

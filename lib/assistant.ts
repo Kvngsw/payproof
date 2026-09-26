@@ -1,21 +1,3 @@
-/**
- * lib/assistant.ts — Order-scoped AI assistant (Gemini 3.8 Flash).
- *
- * WHY: The assistant answers questions about a specific order from the
- * order's verified data snapshot. It cannot access other orders, cannot
- * make changes, and is explicitly scoped to the order context.
- *
- * Security:
- *   - System prompt enforces scope: "Only answer from the provided snapshot"
- *   - Off-topic / prompt-injection attempts get a fixed refusal string
- *   - max_tokens ≈ 300 — no essay-length responses
- *   - 10s timeout — 502 returned to client if Gemini is slow
- *   - Never claim this is "verifying payments" — it reads verified data
- *   - Fraud flag is never called "AI" — it's "Rule-based"
- *
- * Returns { answer, order_status, scope: 'order' } per spec E22.
- */
-
 import { logger }     from './logger';
 import { RailTimeoutError } from './errors';
 import { env } from './env';
@@ -23,7 +5,6 @@ import { env } from './env';
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
 
-/** Fixed refusal string — never varies, prevents info leakage via refusal phrasing. */
 const REFUSAL =
   "I can only answer questions about this specific order. " +
   "For other questions, please contact support.";
@@ -34,16 +15,19 @@ export interface AssistantResult {
   scope:        'order';
 }
 
+export interface OrderSnapshot {
+  id:     string;
+  status: string;
+  [key: string]: unknown;
+}
+
 export async function askAssistant(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  orderSnapshot: Record<string, any>,
+  orderSnapshot: OrderSnapshot,
   userMessage:   string,
 ): Promise<AssistantResult> {
-  // Validated at boot by lib/env.ts — the server refuses to start without it.
+
   const apiKey = env.GEMINI_API_KEY;
 
-  // Makinde owns docs/ai-prompt.md — the prompt is injected via env var
-  // in production so it can be updated without a deploy.
   const systemPrompt = env.AI_SYSTEM_PROMPT ?? buildDefaultSystemPrompt();
 
   const snapshotJson = JSON.stringify(orderSnapshot, null, 2);
@@ -64,13 +48,13 @@ export async function askAssistant(
     ],
     generationConfig: {
       maxOutputTokens: 350,
-      temperature:     0.2,   // Low temperature — factual, not creative
+      temperature:     0.2, // low: factual, never creative
       topP:            0.8,
     },
   };
 
   const controller = new AbortController();
-  const timeout    = setTimeout(() => controller.abort(), 10_000);
+  const timeout    = setTimeout(() => controller.abort(), 10_000); // spec E22: 10s, then 502
 
   let response: Response;
   try {
@@ -96,13 +80,14 @@ export async function askAssistant(
     throw new RailTimeoutError('AI assistant unavailable.');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data: any = await response.json();
+  interface GeminiResponse {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  }
+  const data = (await response.json()) as GeminiResponse;
   const rawAnswer: string =
     data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
-  // If the model produced an empty answer, return the refusal.
-  const answer = rawAnswer.trim() || REFUSAL;
+  const answer = rawAnswer.trim() || REFUSAL; // empty model output degrades to refusal, never blank
 
   logger.info('Assistant response generated', {
     orderId:     orderSnapshot.id,

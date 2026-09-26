@@ -1,10 +1,3 @@
-/**
- * app/api/v1/orders/[id]/ship/route.ts — Mark as shipped (E17).
- *
- * POST — seller (owner). `AwaitingShipment → Shipped`, tracking set to
- * `Picked Up`, source `manual`. Illegal transitions → 409 INVALID_TRANSITION.
- */
-
 import { z } from 'zod';
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
@@ -41,7 +34,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!claims) return unauthorized();
     if (claims.role !== 'seller') return forbidden('Only the seller can ship this order.');
 
-    // 30/min per seller — state-changing; budget covers retries, not floods.
     const { allowed, retryAfterMs } = await checkRateLimit(`act:ship:${claims.sub}`, 30, 60_000);
     if (!allowed) return tooManyRequestsResponse(retryAfterMs);
 

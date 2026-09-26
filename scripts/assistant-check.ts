@@ -1,14 +1,9 @@
-/**
- * scripts/assistant-check.ts — Live E22 verification (needs GEMINI_API_KEY).
- * OTP-login as seed buyer → ask in-scope Q → ask off-topic Q (refusal).
- * Run against dev server: npx tsx --env-file=.env.local scripts/assistant-check.ts
- */
 import db from '../lib/db';
 
 const BASE = 'http://localhost:3000/api/v1';
 
 async function main() {
-  // OTP as seed buyer (dev mode returns the code).
+
   const otpReq = await fetch(BASE + '/auth/buyer/otp/request', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

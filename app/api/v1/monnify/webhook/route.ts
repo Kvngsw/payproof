@@ -1,26 +1,3 @@
-/**
- * app/api/v1/monnify/webhook/route.ts — Monnify payment webhook (E16).
- *
- * POST, public + HMAC signature. Always responds fast; processing is
- * idempotent and safe to retry.
- *
- * Pipeline (§7.6):
- *   1. Raw body (no JSON middleware) → verify HMAC-SHA512 via
- *      `monnify-signature` header (timingSafeEqual). Sandbox skips —
- *      Monnify sends no signature there. Prod failure → 401 BAD_SIGNATURE.
- *   2. Ignore non-SUCCESSFUL_TRANSACTION events → 200.
- *   3. Look up order by `eventData.paymentReference` (OUR ref from
- *      initializeTransaction) — NOT by (sellerId, amount). This is the fix
- *      for 1.0's critical misattribution bug.
- *   4. Atomic dedup via WebhookEvent (crash recovery: processed=false →
- *      re-process on retry).
- *   5. Respond 200 immediately after the claim is committed.
- *   6. Server-side verifyTransaction(reference) — never trust the body.
- *   7. One DB txn: payment → stock decrement (D10) → Paid → AwaitingShipment
- *      → fraud rule → events. Mismatch → stay PendingPayment + PAYMENT_MISMATCH
- *      event (permanent, no retry loop).
- */
-
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -58,7 +35,7 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    rawBody = await request.text();
+    rawBody = await request.text(); // HMAC needs raw bytes: no JSON middleware before verify
     payload = JSON.parse(rawBody);
   } catch {
     logger.warn('Webhook: unparseable body — ACK to avoid retry storm', { requestId });
@@ -81,9 +58,8 @@ export async function POST(request: NextRequest) {
     return ACK();
   }
 
-  // OUR payment reference (set at initializeTransaction) — unique per order.
   const paymentRef = eventData?.paymentReference;
-  // Monnify's own reference — dedup key + server-side verify key.
+
   const transactionRef = eventData?.transactionReference;
 
   if (!paymentRef || !transactionRef) {
@@ -91,7 +67,6 @@ export async function POST(request: NextRequest) {
     return ACK();
   }
 
-  // ── Atomic dedup claim (survives serverless kills) ─────────────────────────
   try {
     await db.webhookEvent.create({
       data: { id: transactionRef, processed: false, payload: eventData as object },
@@ -125,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Claim committed → ACK fast. Heavy work continues below.
+  // ACK first: slow webhooks get retried by Monnify, so claim-then-respond
   const processing = handleNotification(String(paymentRef), String(transactionRef), requestId);
 
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
@@ -155,16 +130,15 @@ async function markProcessed(transactionRef: string) {
 }
 
 async function handleNotification(paymentRef: string, transactionRef: string, requestId: string) {
-  // ── Reference-keyed lookup (the 1.0 bug fix) ───────────────────────────────
+
   const order = await findOrderByReference(paymentRef);
 
   if (!order) {
     logger.warn('Webhook: no order for paymentReference', { paymentRef, transactionRef, requestId });
-    await markProcessed(transactionRef); // permanent — retry won't create an order
+    await markProcessed(transactionRef);
     return;
   }
 
-  // Idempotency: only PendingPayment orders advance. Anything else = replay.
   if (order.status !== 'PendingPayment') {
     logger.info('Webhook: order not pending — replay ignored', {
       orderId: order.id,
@@ -176,8 +150,6 @@ async function handleNotification(paymentRef: string, transactionRef: string, re
     return;
   }
 
-  // ── Server-side verification (never trust the body) ────────────────────────
-  // Backfill Monnify's transaction ref for rows created before providerRef.
   if (!order.payments?.[0]?.providerRef) {
     await db.payment
       .update({ where: { reference: paymentRef }, data: { providerRef: transactionRef } })
@@ -186,7 +158,7 @@ async function handleNotification(paymentRef: string, transactionRef: string, re
 
   let verified: Awaited<ReturnType<typeof verifyTransaction>>;
   try {
-    verified = await verifyTransaction(transactionRef);
+    verified = await verifyTransaction(transactionRef); // never trust the body: server-side truth only
   } catch (err) {
     logger.error('Webhook: verify call failed — claim removed for retry', {
       orderId: order.id,
@@ -213,16 +185,15 @@ async function handleNotification(paymentRef: string, transactionRef: string, re
       data: {
         orderId: order.id,
         fromStatus: 'PendingPayment',
-        toStatus: 'PendingPayment',
+        toStatus: 'PendingPayment', // stay put but leave an audit trail
         actor: 'system',
         note: `PAYMENT_MISMATCH status=${verified.paymentStatus} amount=${verified.amountKobo} expected=${order.totalKobo}`,
       },
     });
-    await markProcessed(transactionRef); // permanent — amounts won't change
+    await markProcessed(transactionRef);
     return;
   }
 
-  // ── Atomic money txn ───────────────────────────────────────────────────────
   try {
     await db.$transaction(async (tx) => {
       await tx.payment.update({
@@ -236,13 +207,11 @@ async function handleNotification(paymentRef: string, transactionRef: string, re
         },
       });
 
-      // D10: decrement stock on Paid, inside the same txn.
       await decrementStock(order.productId, tx);
 
       await transition(order.id, 'Paid', 'system', `Monnify ref ${transactionRef}`, tx);
       await transition(order.id, 'AwaitingShipment', 'system', undefined, tx);
 
-      // Fraud rule (informational only, never blocks — D15).
       const fraud = await runFraudCheck(order.sellerId, order.totalKobo);
       await tx.order.update({
         where: { id: order.id },

@@ -1,13 +1,3 @@
-/**
- * scripts/db-activate-role.ts — Set the payproof_app role password (out-of-band).
- *
- * The migration creates the role NOLOGIN with zero secrets in git history.
- * This script activates it using the superuser DIRECT_URL. The password is
- * passed via argv (never committed) and stored in .env.local APP_DATABASE_URL.
- *
- * Run once per environment:
- *   npx tsx --env-file=.env.local scripts/db-activate-role.ts <password>
- */
 import pg from 'pg';
 
 const { Client } = pg;

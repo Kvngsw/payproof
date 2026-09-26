@@ -1,10 +1,3 @@
-/**
- * app/api/v1/products/[id]/route.ts — Product detail + owner update (E09, E11).
- *
- * GET   — public, `Product`
- * PATCH — seller (owner only), partial of create shape. Non-owner → 403.
- */
-
 import { z } from 'zod';
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
@@ -63,7 +56,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const product = await db.product.findUnique({ where: { id } });
     if (!product) return notFound('Product');
 
-    // Owner-only writes — spec INT-02 acceptance: non-owner PATCH → 403.
     if (product.sellerId !== String(claims.sub)) {
       return forbidden('You can only update your own products.');
     }

@@ -1,26 +1,5 @@
-/**
- * lib/api-response.ts — Consistent response shape.
- *
- * WHY: Your frontend shouldn't need 10 different error-handling patterns.
- * WHY: 200 OK on a failed operation is a lie that breaks clients.
- *
- * Every response from every endpoint has one of two shapes:
- *   Success: { data: T }
- *   Error:   { error: { code: ErrorCode, message: string, details?: {} } }
- *
- * The requestId is always included in error responses so support can
- * trace a specific request across all 50 log lines it produced.
- *
- * Ported and upgraded from PayProof 1.0 lib/apiResponse.js:
- *   + Error shape now matches spec §7.1 exactly
- *   + Added all 2.0 error codes
- *   + AppError instances are automatically serialised
- */
-
 import { logger } from './logger';
 import { AppError, type ErrorCode } from './errors';
-
-// ── Spec-exact error shape (§7.1) ─────────────────────────────────────────────
 
 interface ErrorBody {
   error: {
@@ -31,18 +10,10 @@ interface ErrorBody {
   requestId?: string;
 }
 
-// ── Success ───────────────────────────────────────────────────────────────────
-
 export function ok<T>(data: T, status = 200): Response {
   return Response.json(data, { status });
 }
 
-// ── App-level typed errors ────────────────────────────────────────────────────
-
-/**
- * Serialize any AppError subclass into the correct HTTP response.
- * This is the primary handler for domain errors in route handlers.
- */
 export function appError(err: AppError, requestId?: string): Response {
   const body: ErrorBody = {
     error: {
@@ -54,8 +25,6 @@ export function appError(err: AppError, requestId?: string): Response {
   };
   return Response.json(body, { status: err.httpStatus });
 }
-
-// ── Explicit status helpers (for simple cases without a class) ────────────────
 
 export function badRequest(
   message: string,
@@ -115,13 +84,6 @@ export function railError(message: string, requestId?: string): Response {
   return Response.json(body, { status: 502 });
 }
 
-// ── Server error (unhandled) ──────────────────────────────────────────────────
-
-/**
- * For genuinely unexpected errors. Logs full details server-side,
- * returns a safe generic message to the client.
- * NEVER put stack traces or internal error messages in the response body.
- */
 export function serverError(err: unknown, context: string, requestId?: string): Response {
   logger.error('Unhandled server error', {
     context,
@@ -138,12 +100,6 @@ export function serverError(err: unknown, context: string, requestId?: string): 
   );
 }
 
-// ── Route-level error dispatcher ──────────────────────────────────────────────
-
-/**
- * Universal catch handler for route try/catch blocks.
- * Checks for AppError first (typed, expected), falls back to serverError.
- */
 export function handleError(err: unknown, context: string, requestId?: string): Response {
   if (err instanceof AppError) return appError(err, requestId);
   return serverError(err, context, requestId);

@@ -1,7 +1,3 @@
-/**
- * scripts/verify-check.ts — Isolate the verifyTransaction call.
- * Run: npx tsx --env-file=.env.local scripts/verify-check.ts <transactionReference>
- */
 import { verifyTransaction } from '../lib/monnify';
 
 const ref = process.argv[2];

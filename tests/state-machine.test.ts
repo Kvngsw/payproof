@@ -1,11 +1,3 @@
-/**
- * tests/state-machine.test.ts — QA-02.
- *
- * Every legal transition (§7.4) returns true for the correct actor;
- * every illegal pair returns false. Actor enforcement is tested explicitly:
- * a buyer cannot ship, a seller cannot confirm-delivery.
- */
-
 import { describe, it, expect } from 'vitest';
 import { canTransition, isTerminal, type OrderState, type Actor } from '../lib/order-service';
 
@@ -23,18 +15,18 @@ const LEGAL: Array<[OrderState, OrderState, Actor]> = [
 ];
 
 const ILLEGAL: Array<[OrderState, OrderState, Actor]> = [
-  // Skips
+
   ['PendingPayment', 'Shipped', 'system'],
   ['PendingPayment', 'Completed', 'buyer'],
   ['Paid', 'Shipped', 'seller'],
-  // Wrong actor
+
   ['AwaitingShipment', 'Shipped', 'buyer'],
   ['AwaitingShipment', 'Shipped', 'system'],
   ['Delivered', 'Completed', 'seller'],
   ['Delivered', 'Completed', 'system'],
   ['Shipped', 'Disputed', 'seller'],
   ['PendingPayment', 'Cancelled', 'seller'],
-  // Backwards / out of terminal states
+
   ['Paid', 'PendingPayment', 'system'],
   ['Completed', 'Disputed', 'buyer'],
   ['Cancelled', 'Paid', 'system'],

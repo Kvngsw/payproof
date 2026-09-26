@@ -1,13 +1,3 @@
-/**
- * app/api/v1/orders/[id]/assistant/route.ts — Order-scoped AI Q&A (E22).
- *
- * POST — party only. `{ message }` → `{ answer, order_status, scope }`.
- * The model sees ONLY this order's snapshot: no tools, no writes, no other
- * orders. Off-scope / injection attempts get the fixed refusal string.
- * 10s model timeout → 502 + FE "Assistant unavailable".
- * 15 req/min per user — model calls cost money and latency.
- */
-
 import { z } from 'zod';
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
@@ -40,8 +30,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const claims = authenticate(request);
     if (!claims) return unauthorized();
 
-    // 15/min per user — Gemini calls cost money and latency; never unbounded.
-    const { allowed, retryAfterMs } = await checkRateLimit(`assistant:${claims.sub}`, 15, 60_000);
+    const { allowed, retryAfterMs } = await checkRateLimit(`assistant:${claims.sub}`, 15, 60_000); // model calls cost money: never unbounded
     if (!allowed) {
       return tooManyRequestsResponse(retryAfterMs);
     }
@@ -69,7 +58,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       return badRequest(parsed.error.issues[0].message);
     }
 
-    // Snapshot only — the model never touches the DB.
     const snapshot = {
       id: order.id,
       status: order.status,

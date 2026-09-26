@@ -1,14 +1,3 @@
-/**
- * app/api/v1/orders/route.ts — Order list + create (E13, E12).
- *
- * GET  /api/v1/orders?status= — buyer/seller, role-scoped `[OrderSummary]`
- * POST /api/v1/orders          — buyer, `{ product_id, delivery_address,
- * phone }` → `201 { order, payment: { reference, provider, checkout_url } }`
- * `409 OUT_OF_STOCK` when stock is 0.
- *
- * Stock is CHECKED here but DECREMENTED only on Paid (webhook, D10).
- */
-
 import crypto from 'crypto';
 import { z } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
@@ -104,7 +93,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!product) return notFound('Product');
-    if (product.stockQuantity <= 0) throw new OutOfStockError(product_id);
+    if (product.stockQuantity <= 0) throw new OutOfStockError(product_id); // check here, decrement only on Paid (D10)
 
     const buyer = await db.buyer.findUnique({ where: { id: buyerId } });
     if (!buyer) return unauthorized('Session expired. Please log in again.');
@@ -112,7 +101,6 @@ export async function POST(request: NextRequest) {
     const totalKobo = product.priceKobo + product.dispatchFeeKobo;
     const ref = `pp_ord_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`;
 
-    // Create order + pending payment row atomically.
     const order = await db.$transaction(async (tx) => {
       const created = await tx.order.create({
         data: {
@@ -162,8 +150,6 @@ export async function POST(request: NextRequest) {
       requestId,
     });
 
-    // Initialise hosted checkout. On rail failure, compensate by removing the
-    // pending order so no orphan PendingPayment rows accumulate.
     let checkout: { reference: string; checkoutUrl: string };
     try {
       checkout = await initializeTransaction({
@@ -174,8 +160,6 @@ export async function POST(request: NextRequest) {
         redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/orders/${order.id}/return`,
       });
 
-      // Persist Monnify's transaction ref alongside ours: ours is the
-      // webhook/E12 lookup key, theirs is the server-side verify key.
       await db.payment.update({
         where: { reference: ref },
         data: { providerRef: checkout.reference },
@@ -186,7 +170,7 @@ export async function POST(request: NextRequest) {
         err: railErr,
         requestId,
       });
-      await db.payment.deleteMany({ where: { orderId: order.id } });
+      await db.payment.deleteMany({ where: { orderId: order.id } }); // rail failed: no orphan PendingPayment rows
       await db.orderEvent.deleteMany({ where: { orderId: order.id } });
       await db.order.delete({ where: { id: order.id } }).catch(() => {});
       throw new RailError('Could not initialise payment. Please try again.');

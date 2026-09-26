@@ -1,9 +1,3 @@
-/**
- * app/api/v1/orders/[id]/cancel/route.ts — Buyer cancels unpaid order (E24).
- *
- * POST — buyer (owner). Only from `PendingPayment` (D3). Anything else → 409.
- */
-
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { logger } from '@/lib/logger';

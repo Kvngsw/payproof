@@ -1,28 +1,3 @@
-/**
- * app/api/v1/auth/seller/register/route.ts — Seller registration (E01).
- *
- * POST body: { name, email, password, phone, businessName, bvn,
- *              settlement: { bankCode, accountNumber } }
- *
- * Response 201: { token, seller, reserved_account }
- *
- * All 25 elite layers active here:
- *   ✓ Rate limiting (5/15min per IP)
- *   ✓ Zod validation (all fields)
- *   ✓ bcrypt hash (rounds=12)
- *   ✓ BVN hashed (SHA-256) before storage — never plaintext
- *   ✓ Monnify reserved account created (real API call)
- *   ✓ UUID id
- *   ✓ Rollback on Monnify failure (atomic)
- *   ✓ httpOnly refresh cookie set
- *   ✓ Request ID propagated
- *   ✓ Structured logging (no console.log)
- *   ✓ Typed errors
- *   ✓ Consistent error shape (§7.1)
- *   ✓ 201 on success (not 200)
- *   ✓ Role-scoped response (settlement masked)
- */
-
 import crypto  from 'crypto';
 import bcrypt  from 'bcrypt';
 import { z }   from 'zod';
@@ -55,7 +30,6 @@ export async function POST(request: NextRequest) {
   const requestId = getRequestId(request);
   const ip        = clientIp(request);
 
-  // ── Rate limit: 5 registrations per IP per 15 minutes ─────────────────────
   const { allowed, retryAfterMs } = await checkRateLimit(`reg:${ip}`, 5, 15 * 60_000);
   if (!allowed) {
     logger.warn('Register rate limit exceeded', { ip, requestId });
@@ -63,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // ── Parse + validate body ──────────────────────────────────────────────
+
     const raw    = await request.json().catch(() => null);
     const parsed = BodySchema.safeParse(raw);
 
@@ -77,11 +51,9 @@ export async function POST(request: NextRequest) {
     const { name, email, password, phone, businessName, bvn, settlement } = parsed.data;
     const cleanEmail = email.toLowerCase();
 
-    // ── Check for duplicate email ──────────────────────────────────────────
     const existing = await db.seller.findUnique({ where: { email: cleanEmail } });
     if (existing) return conflict('An account with this email already exists. Please log in.');
 
-    // ── Validate settlement bank account ───────────────────────────────────
     let validated: { accountName: string; accountNumber: string; bankCode: string };
     try {
       validated = await validateBankAccount(settlement.bankCode, settlement.accountNumber);
@@ -91,15 +63,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── Hash password ──────────────────────────────────────────────────────
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-    // WHY (BVN hash): Never store BVN plaintext. SHA-256 is used (not bcrypt)
-    // because we never need to compare it — we only need to send the original
-    // to Monnify at registration time (before hashing).
-    const bvnHash = crypto.createHash('sha256').update(bvn).digest('hex');
+    const bvnHash = crypto.createHash('sha256').update(bvn).digest('hex'); // BVN never stored plaintext; hash is one-way
 
-    // ── Create seller ──────────────────────────────────────────────────────
     let seller;
     try {
       seller = await db.seller.create({
@@ -124,14 +91,13 @@ export async function POST(request: NextRequest) {
 
     logger.info('Seller registered', { sellerId: seller.id, email: cleanEmail, requestId });
 
-    // ── Create Monnify reserved account ────────────────────────────────────
     let reservedAccount: { accountNumber: string; bankName: string; accountName: string } | null = null;
     try {
       reservedAccount = await createReservedAccount({
         userId: seller.id,
         name:   seller.name,
         email:  seller.email,
-        bvn,        // Raw BVN sent to Monnify — not the hash
+        bvn,
       });
 
       await db.seller.update({
@@ -143,20 +109,19 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (monnifyErr) {
-      // Roll back the seller row so they can retry with corrected BVN.
+
       logger.error('Monnify reserved account failed — rolling back', {
         sellerId: seller.id,
         err: monnifyErr,
         requestId,
       });
-      await db.seller.delete({ where: { id: seller.id } }).catch(() => {});
+      await db.seller.delete({ where: { id: seller.id } }).catch(() => {}); // rail failed: no seller without an account
       return badRequest(
         "We couldn't open your reserved account with Monnify. " +
         "Please double-check your BVN and try again.",
       );
     }
 
-    // ── Issue tokens ───────────────────────────────────────────────────────
     const payload  = { sub: seller.id, role: 'seller' as const, name: seller.name };
     const access   = signAccessToken(payload);
     const refresh  = signRefreshToken(payload);
@@ -184,7 +149,6 @@ export async function POST(request: NextRequest) {
       201,
     );
 
-    // httpOnly refresh cookie — JavaScript can't touch it.
     response.headers.set('Set-Cookie', refreshCookieHeader(refresh));
 
     return response;

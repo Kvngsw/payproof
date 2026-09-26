@@ -1,12 +1,3 @@
-/**
- * app/api/v1/payouts/release/[id]/route.ts — Manual payout release.
- *
- * POST — party only (buyer or seller). Order must be Completed; Disputed
- * history or a prior claim → 409. Idempotent: repeat calls return existing
- * status. Normally triggered automatically by confirm-delivery; this endpoint
- * covers retries when the auto-release failed mid-flight.
- */
-
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -34,7 +25,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     const claims = authenticate(request);
     if (!claims) return unauthorized();
 
-    // Tightest budget: fires real rail transfers. Idempotent, but bounded.
     const { allowed, retryAfterMs } = await checkRateLimit(`act:release:${claims.sub}`, 10, 60_000);
     if (!allowed) return tooManyRequestsResponse(retryAfterMs);
 
@@ -46,7 +36,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       return notFound('Order');
     }
 
-    const payout = await releasePayout(order.id);
+    const payout = await releasePayout(order.id); // idempotent: safe retry when auto-release died mid-flight
 
     logger.info('Payout released (manual trigger)', {
       orderId: order.id,

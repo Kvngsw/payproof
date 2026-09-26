@@ -1,10 +1,3 @@
-/**
- * app/api/v1/products/route.ts — Product list + create (E08, E10).
- *
- * GET  /api/v1/products?seller_id=  — public, `[Product]`
- * POST /api/v1/products              — seller, `201 Product`
- */
-
 import { z } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
