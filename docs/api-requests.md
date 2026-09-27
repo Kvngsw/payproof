@@ -9,6 +9,19 @@ Base URL: `https://payproof-seven.vercel.app/api/v1` · errors already compatibl
 
 ---
 
+## 0. Send this to BE (summary, priority-ordered)
+
+| Pri | Ask | Detail | Until it lands |
+|---|---|---|---|
+| **P1** | Invoices endpoints | §1.1 — list/create/public-get/cancel + pay→order flow, Prisma models included | FE invoice pages (4 of 8 dashboard pages) are **hidden in live mode** (`DemoDataNotice`); fully working against mock |
+| **P2** | Response shapes | §2 — R1, R3, R5, R6 (high), R2, R4 (medium), **R7 is a security fix** (products list is public & unscoped today) | FE normalizes every response client-side (§4 W1–W3) — works, but adapters stay until you fix the shapes |
+| **P3** | Validation relaxations | §3 — V1–V4, V6 | FE pads/sends silent defaults (§4 W4) — harmless but fragile |
+| ⚠️ | Decisions | §6 — invoice rail, invoice split payout, products-list visibility | blocks closing §1.1/§2 properly |
+
+Already handled on our side (keep when merging): `DELETE /products/:id` shipped in this repo (§1.2) · live OTP now sends real SMTP email — `dev_code`/`OTP_MODE` are **gone** from v1 (§1.3).
+
+---
+
 ## 1. Endpoints to build
 
 ### 1.1 Invoices (highest priority — 4 of 8 dashboard pages depend on this)
@@ -107,8 +120,7 @@ creation time). Seller then sees it in the normal orders list. Paying a `cancell
 
 ### 1.2 `DELETE /api/v1/products/:id`
 
-Missing entirely (route currently exposes GET+PATCH only). The inventory page's delete button gets `405`.
-**We are adding this handler ourselves in this repo** — please keep it when merging:
+Missing entirely (route originally exposed GET+PATCH only). **Shipped in this repo** — please keep it when merging:
 
 - seller auth + ownership (mirror the PATCH handler's checks), `404` unknown, `200 {ok:true}`
 - `409 {code:"PRODUCT_HAS_ORDERS"}` if any order references the product (don't cascade-delete paid history)
@@ -118,7 +130,7 @@ Missing entirely (route currently exposes GET+PATCH only). The inventory page's 
 | # | Ask | Detail |
 |---|---|---|
 | 1 | `GET /api/v1/health` is fine | no change — listed for completeness |
-| 2 | Buyer OTP `dev_code` | mock/demo returns `dev_code` (card banner only, no toast); live sends real email via SMTP + nodemailer — **deployed env needs `SMTP_HOST`/`SMTP_USER`/`SMTP_PASS` set or live OTP returns 500** |
+| 2 | Buyer OTP delivery | mock/demo returns `dev_code` (card banner only, no toast); live sends real email via SMTP + nodemailer (verified working). `OTP_MODE`/`RESEND_API_KEY` removed from the schema — **deployed env still needs `SMTP_HOST`/`SMTP_PORT`/`SMTP_SECURE`/`SMTP_USER`/`SMTP_PASS` or live OTP returns 500** |
 | 3 | `GET /sellers/:id` | exists ✓ — FE has no consumer yet (storefront page planned) |
 
 ---
@@ -207,7 +219,8 @@ Legend: ✅ exists & wired · ⚠️ exists with gaps (item id) · ❌ missing �
 
 **Mock-only features the FE depends on** (must not regress when v1 gains them): invoice share
 links, display-status vocabulary, `frozen` payout status, buyer email on orders, top-level
-`reserved_account` on `/auth/me`, snake_case product fields, demo auto-seeding of orders/products.
+`reserved_account` on `/auth/me`, snake_case product fields, code-based demo seeding of
+sellers/orders/products/invoices (SQLite, no data files — any fresh instance self-seeds).
 
 ---
 
