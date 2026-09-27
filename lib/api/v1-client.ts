@@ -241,9 +241,7 @@ export async function loginSeller(payload: {
   return data;
 }
 
-// Auth v2 (docs/api-requests.md §1.4 — not shipped by BE yet):
-// live mode 404s on these until the backend implements them; the FE surfaces
-// the error and the deployed demo runs on Demo data (mock) by default.
+// Auth v2 (docs/api-requests.md §1.4 — shipped on /api/v1):
 export async function login(payload: { email: string; password: string }) {
   const res = await fetch(`${AUTH}/login`, {
     method: "POST",
