@@ -26,10 +26,23 @@ const schema = z.object({
   LOGISTICS_ACCOUNT_NUMBER: z.string().min(1, 'LOGISTICS_ACCOUNT_NUMBER is required'),
   LOGISTICS_ACCOUNT_NAME: z.string().min(1, 'LOGISTICS_ACCOUNT_NAME is required'),
 
-  RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
-  OTP_FROM_EMAIL: z.string().email().default('noreply@payproof.ng'),
-
-  OTP_MODE: z.enum(['dev', 'live']).default('dev'),
+  SMTP_HOST: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().min(1).optional(),
+  ),
+  SMTP_PORT: z.preprocess(
+    (v) => (v === '' || v === undefined ? undefined : v),
+    z.coerce.number().int().optional(),
+  ),
+  SMTP_SECURE: z.stringbool().default(false),
+  SMTP_USER: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().min(1).optional(),
+  ),
+  SMTP_PASS: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().min(1).optional(),
+  ),
 
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
   GEMINI_MODEL: z.string().min(1).default('gemini-3.8-flash'), // config, not code: Google retires models without warning

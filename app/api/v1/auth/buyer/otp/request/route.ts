@@ -73,8 +73,6 @@ export async function POST(request: NextRequest) {
       {
         sent:     true,
         delivery: delivery.delivery,
-
-        ...(delivery.devCode !== undefined && { dev_code: delivery.devCode }),
       },
       { status: 202 },
     );

@@ -69,7 +69,6 @@ export default function RegisterPage() {
           setOtpSent(true);
           if (res.dev_code) {
             setDevCodeBanner(res.dev_code);
-            toast.success(`OTP sent! Dev code: ${res.dev_code}`);
           } else {
             toast.success("OTP sent to your email!");
           }

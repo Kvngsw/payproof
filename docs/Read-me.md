@@ -35,8 +35,7 @@ docker compose up      # or: npm install && npm run dev, per apps/api and apps/w
 | `MONNIFY_API_KEY` / `MONNIFY_SECRET_KEY` / `MONNIFY_CONTRACT_CODE` / `MONNIFY_BASE_URL` | api | Monnify sandbox (`sandbox.monnify.com`) |
 | `MONNIFY_WALLET_ACCOUNT_NUMBER` | api | Sandbox wallet used for outbound transfers |
 | `LOGISTICS_BANK_CODE` / `LOGISTICS_ACCOUNT_NUMBER` / `LOGISTICS_ACCOUNT_NAME` | api | **UNFILLED — blocking the dispatch-fee split (D6). Fill before payout testing is possible.** |
-| `RESEND_API_KEY` / `OTP_FROM_EMAIL` | api | Live-email OTP delivery |
-| `OTP_MODE` | api | `dev` (current) returns the code in the API response; `live` sends real email |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | api | Live OTP email delivery (SMTP + nodemailer). Unset → live OTP returns 500; mock/demo mode is unaffected (shows the code in the card banner). |
 | `GEMINI_API_KEY` | api | Gemini 2.5 Flash, powers the order-scoped AI assistant |
 | `DEMO_FALLBACK` | api | Currently `false` — cached-webhook fallback (E15) is off. Consider `true` until the public webhook URL is proven working. |
 | `NEXT_PUBLIC_APP_URL` | web | Currently `http://localhost:3000` — **needs to become the real deployed URL before webhooks or the deployed demo can work.** |

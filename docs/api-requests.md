@@ -118,7 +118,7 @@ Missing entirely (route currently exposes GET+PATCH only). The inventory page's 
 | # | Ask | Detail |
 |---|---|---|
 | 1 | `GET /api/v1/health` is fine | no change — listed for completeness |
-| 2 | Buyer OTP `dev_code` | already works when `OTP_MODE=dev` — just confirm the deployed env has it set, otherwise local/live demo flows diverge |
+| 2 | Buyer OTP `dev_code` | mock/demo returns `dev_code` (card banner only, no toast); live sends real email via SMTP + nodemailer — **deployed env needs `SMTP_HOST`/`SMTP_USER`/`SMTP_PASS` set or live OTP returns 500** |
 | 3 | `GET /sellers/:id` | exists ✓ — FE has no consumer yet (storefront page planned) |
 
 ---
@@ -188,7 +188,7 @@ Legend: ✅ exists & wired · ⚠️ exists with gaps (item id) · ❌ missing �
 |---|---|---|---|---|
 | Seller register | ✓ | ✅ | ⚠️ V5 | FE sends bvn/settlement in live mode |
 | Seller login | ✓ | ✅ | ✅ | |
-| OTP request/verify | ✓ | ✅ | ✅ | needs `OTP_MODE=dev` deployed |
+| OTP request/verify | ✓ | ✅ (`dev_code` + card banner) | ✅ live sends SMTP email (nodemailer) — `SMTP_*` env required | |
 | `GET /auth/me` | ✓ | ✅ | ⚠️ R5 | |
 | Dashboard | ✓ | ✅ | ⚠️ R6 | |
 | Orders list | ✓ | ✅ | ⚠️ R1 | |
