@@ -13,7 +13,7 @@ import {
   listProducts,
   type MockProduct,
 } from "@/lib/api/mock";
-import { useDashboardSession } from "@/components/dashboard/session-context";
+import { useDashboardSession, useRequireSeller } from "@/components/dashboard/session-context";
 import { useDataSource } from "@/lib/api";
 import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
@@ -36,6 +36,7 @@ const TEXTAREA_CLASS =
   "min-h-24 w-full rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-base outline-none transition-[color,box-shadow,background-color] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm";
 
 export default function NewInvoicePage() {
+  useRequireSeller();
   const router = useRouter();
   const session = useDashboardSession();
   const source = useDataSource();

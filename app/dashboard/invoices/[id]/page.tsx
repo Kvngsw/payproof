@@ -11,7 +11,7 @@ import {
   invoiceLink,
   type MockInvoice,
 } from "@/lib/api/mock";
-import { useDashboardSession } from "@/components/dashboard/session-context";
+import { useDashboardSession, useRequireSeller } from "@/components/dashboard/session-context";
 import { useDataSource } from "@/lib/api";
 import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
@@ -69,6 +69,7 @@ function Row({
 }
 
 export default function InvoiceDetailPage() {
+  useRequireSeller();
   const params = useParams<{ id: string }>();
   const session = useDashboardSession();
   const source = useDataSource();

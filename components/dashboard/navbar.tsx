@@ -11,12 +11,20 @@ import { IconMenu2, IconX, IconLogout2 } from "@tabler/icons-react";
 import { useDashboardSession } from "./session-context";
 import { DataSourceToggle } from "./data-source-switch";
 
-const NAV_ITEMS = [
-  { label: "Home", href: "/dashboard" },
-  { label: "Invoices", href: "/dashboard/invoices" },
-  { label: "Inventory", href: "/dashboard/inventory" },
-  { label: "Orders", href: "/dashboard/orders" },
-] as const;
+type NavItem = { label: string; href: string };
+
+const NAV_ITEMS: Record<"seller" | "buyer", NavItem[]> = {
+  seller: [
+    { label: "Home", href: "/dashboard" },
+    { label: "Invoices", href: "/dashboard/invoices" },
+    { label: "Inventory", href: "/dashboard/inventory" },
+    { label: "Orders", href: "/dashboard/orders" },
+  ],
+  buyer: [
+    { label: "Home", href: "/dashboard" },
+    { label: "Orders", href: "/dashboard/orders" },
+  ],
+};
 
 function initialsOf(name?: string, fallback?: string) {
   const source = (name ?? fallback ?? "?").trim();
@@ -32,7 +40,9 @@ export function DashboardNavbar() {
   const source = useDataSource();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const navItems = NAV_ITEMS.filter(
+  const role =
+    session.status === "authed" ? session.data.role : ("seller" as const);
+  const navItems = NAV_ITEMS[role].filter(
     (item) => source !== "live" || item.href !== "/dashboard/invoices",
   );
 

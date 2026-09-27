@@ -23,6 +23,7 @@ import {
 import { useDashboardSession } from "@/components/dashboard/session-context";
 import { useDataSource } from "@/lib/api";
 import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
+import { BuyerHome } from "@/components/dashboard/buyer-home";
 
 function PayoutLine({
   account,
@@ -170,9 +171,10 @@ export default function DashboardPage() {
   const [dashboard, setDashboard] = useState<SellerDashboard | null>(null);
   const [statsFailed, setStatsFailed] = useState(false);
   const [invoices, setInvoices] = useState<MockInvoice[] | null>(null);
+  const role = session.status === "authed" ? session.data.role : null;
 
   useEffect(() => {
-    if (session.status !== "authed") return;
+    if (role !== "seller") return;
     let cancelled = false;
     getSellerDashboard()
       .then((data) => {
@@ -191,7 +193,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [session.status]);
+  }, [role]);
 
   if (session.status === "loading") {
     return (
@@ -209,6 +211,10 @@ export default function DashboardPage() {
 
   if (session.status === "error") {
     return null;
+  }
+
+  if (role === "buyer") {
+    return <BuyerHome />;
   }
 
   const { profile, reserved_account } = session.data;

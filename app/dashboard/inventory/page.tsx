@@ -33,7 +33,7 @@ import {
   updateProduct,
   type MockProduct,
 } from "@/lib/api";
-import { useDashboardSession } from "@/components/dashboard/session-context";
+import { useDashboardSession, useRequireSeller } from "@/components/dashboard/session-context";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
 import { Amount } from "@/components/amount";
 import { IconPlus, IconDots, IconPencil, IconTrash } from "@tabler/icons-react";
@@ -83,6 +83,7 @@ function StockChip({ stock }: { stock: number }) {
 
 export default function InventoryPage() {
   const session = useDashboardSession();
+  useRequireSeller();
   const [products, setProducts] = useState<MockProduct[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);

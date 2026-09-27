@@ -50,6 +50,7 @@ export default function OrdersPage() {
   }, [session.status]);
 
   const loading = session.status === "loading" || (orders === null && !failed);
+  const isBuyer = session.status === "authed" && session.data.role === "buyer";
 
   return (
     <div>
@@ -59,7 +60,9 @@ export default function OrdersPage() {
             Orders
           </h1>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Payments, shipments, and payouts in one place.
+            {isBuyer
+              ? "Everything you've bought, from checkout to delivery."
+              : "Payments, shipments, and payouts in one place."}
           </p>
         </div>
       </div>
@@ -87,15 +90,16 @@ export default function OrdersPage() {
             No orders yet
           </h2>
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-            When buyers pay into your reserved account, their orders will show
-            up here.
+            {isBuyer
+              ? "Orders you pay for will show up here."
+              : "When buyers pay into your reserved account, their orders will show up here."}
           </p>
         </div>
       )}
 
       {!loading && !failed && orders && orders.length > 0 && (
         <div className="mt-8">
-          <OrdersTable orders={orders} />
+          <OrdersTable orders={orders} variant={isBuyer ? "buyer" : "seller"} />
         </div>
       )}
     </div>

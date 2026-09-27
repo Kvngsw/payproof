@@ -25,7 +25,7 @@ import {
   listInvoices,
   type MockInvoice,
 } from "@/lib/api/mock";
-import { useDashboardSession } from "@/components/dashboard/session-context";
+import { useDashboardSession, useRequireSeller } from "@/components/dashboard/session-context";
 import { useDataSource } from "@/lib/api";
 import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
@@ -79,6 +79,7 @@ function CopyLinkButton({ id }: { id: string }) {
 }
 
 export default function InvoicesPage() {
+  useRequireSeller();
   const router = useRouter();
   const session = useDashboardSession();
   const source = useDataSource();

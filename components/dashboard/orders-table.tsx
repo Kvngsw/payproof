@@ -40,7 +40,13 @@ function PayoutCell({ status }: { status: string }) {
   return <span className={style.className}>{style.label}</span>;
 }
 
-export function OrdersTable({ orders }: { orders: MockOrder[] }) {
+export function OrdersTable({
+  orders,
+  variant = "seller",
+}: {
+  orders: MockOrder[];
+  variant?: "seller" | "buyer";
+}) {
   const router = useRouter();
 
   function open(order: MockOrder) {
@@ -54,9 +60,11 @@ export function OrdersTable({ orders }: { orders: MockOrder[] }) {
           <TableRow className="hover:bg-transparent">
             <TableHead>Status</TableHead>
             <TableHead>Product</TableHead>
-            <TableHead className="hidden lg:table-cell">Buyer</TableHead>
+            {variant === "seller" && (
+              <TableHead className="hidden lg:table-cell">Buyer</TableHead>
+            )}
             <TableHead className="text-right">Total</TableHead>
-            <TableHead>Payout</TableHead>
+            {variant === "seller" && <TableHead>Payout</TableHead>}
             <TableHead className="hidden lg:table-cell">Updated</TableHead>
           </TableRow>
         </TableHeader>
@@ -87,15 +95,19 @@ export function OrdersTable({ orders }: { orders: MockOrder[] }) {
                   )}
                 </div>
               </TableCell>
-              <TableCell className="hidden max-w-44 truncate text-muted-foreground lg:table-cell">
-                {order.buyer_email}
-              </TableCell>
+              {variant === "seller" && (
+                <TableCell className="hidden max-w-44 truncate text-muted-foreground lg:table-cell">
+                  {order.buyer_email}
+                </TableCell>
+              )}
               <TableCell className="text-right font-medium tabular-nums">
                 <Amount value={order.amounts.total_kobo / 100} />
               </TableCell>
-              <TableCell>
-                <PayoutCell status={order.payout?.status} />
-              </TableCell>
+              {variant === "seller" && (
+                <TableCell>
+                  <PayoutCell status={order.payout?.status} />
+                </TableCell>
+              )}
               <TableCell className="hidden text-muted-foreground lg:table-cell">
                 {formatDate(order.updated_at)}
               </TableCell>

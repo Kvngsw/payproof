@@ -58,12 +58,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         const data = (await getMe()) as MeResponse;
         if (cancelled) return;
 
-        if (data.role === "buyer") {
-          toast.info("The buyer dashboard isn't built yet. Taking you home.");
-          router.replace("/");
-          return;
-        }
-
         setState({ status: "authed", data });
       } catch {
         if (cancelled) return;
@@ -82,4 +76,16 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   return (
     <SessionContext.Provider value={state}>{children}</SessionContext.Provider>
   );
+}
+
+export function useRequireSeller() {
+  const router = useRouter();
+  const session = useDashboardSession();
+
+  useEffect(() => {
+    if (session.status === "authed" && session.data.role === "buyer") {
+      toast.info("That page is for sellers only. Taking you home.");
+      router.replace("/dashboard");
+    }
+  }, [session, router]);
 }
