@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, generateId, hashPassword } from "@/lib/mock/store";
-import { issueToken } from "@/lib/mock/auth";
 import { ensureDemoData } from "@/lib/mock/seed";
+import { issueOtp } from "@/lib/mock/otp";
 
 export const dynamic = "force-dynamic";
 
@@ -49,30 +49,16 @@ export async function POST(request: Request) {
 
     db.sellers.insert(seller);
 
-    const token = issueToken({ sub: id, role: "seller", name, email });
+    // Auth v2: no token at register — OTP verification at /otp signs them in.
+    const dev_code = issueOtp(email);
 
     return NextResponse.json(
-      {
-        token,
-        seller: {
-          id,
-          name,
-          email,
-          phone,
-          business_name,
-          created_at,
-        },
-        reserved_account: {
-          account_number: reserved_account_number,
-          bank_name: reserved_bank,
-          account_name: reserved_account_name,
-        },
-      },
-      { status: 201 }
+      { sent: true, delivery: "dev_screen", dev_code },
+      { status: 202 }
     );
-  } catch (err: any) {
+  } catch (err) {
     return NextResponse.json(
-      { error: { code: "VALIDATION", message: err.message || "Invalid request" } },
+      { error: { code: "VALIDATION", message: err instanceof Error ? err.message : "Invalid request" } },
       { status: 400 }
     );
   }

@@ -41,9 +41,10 @@ export async function GET(request: Request) {
         { status: 404 }
       );
     }
+    const { password_hash, ...profile } = buyer;
     return NextResponse.json({
       role: "buyer",
-      profile: buyer,
+      profile,
     });
   }
 }

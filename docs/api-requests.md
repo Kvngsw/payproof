@@ -14,6 +14,7 @@ Base URL: `https://payproof-seven.vercel.app/api/v1` · errors already compatibl
 | Pri | Ask | Detail | Until it lands |
 |---|---|---|---|
 | **P1** | Invoices endpoints | §1.1 — list/create/public-get/cancel + pay→order flow, Prisma models included | FE invoice pages (4 of 8 dashboard pages) are **hidden in live mode** (`DemoDataNotice`); fully working against mock |
+| **P1.5** | Auth v2 (password login + OTP for both roles) | §1.4 — breaking seller-register response, `Buyer.passwordHash`/`name` migration | FE + mock shipped (one sign-in form, `/signup` split, shared `/otp`); **live auth 404s until built** — deployed default is Demo data meanwhile |
 | **P2** | Response shapes | §2 — R1, R3, R5, R6 (high), R2, R4 (medium), **R7 is a security fix** (products list is public & unscoped today) | FE normalizes every response client-side (§4 W1–W3) — works, but adapters stay until you fix the shapes |
 | **P3** | Validation relaxations | §3 — V1–V4, V6 | FE pads/sends silent defaults (§4 W4) — harmless but fragile |
 | ⚠️ | Decisions | §6 — invoice rail, invoice split payout, products-list visibility | blocks closing §1.1/§2 properly |
@@ -133,6 +134,27 @@ Missing entirely (route originally exposed GET+PATCH only). **Shipped in this re
 | 2 | Buyer OTP delivery | mock/demo returns `dev_code` (card banner only, no toast); live sends real email via SMTP + nodemailer (verified working). `OTP_MODE`/`RESEND_API_KEY` removed from the schema — **deployed env still needs `SMTP_HOST`/`SMTP_PORT`/`SMTP_SECURE`/`SMTP_USER`/`SMTP_PASS` or live OTP returns 500** |
 | 3 | `GET /sellers/:id` | exists ✓ — FE has no consumer yet (storefront page planned) |
 
+### 1.4 Auth v2 — password login + OTP for both roles (FE + mock shipped)
+
+Sign-in is now **one email+password form for both roles** (no seller/buyer toggle), followed
+by a shared `/otp` page; sign-up is role-split at `/signup` → `/signup/buyer` or
+`/signup/seller` (seller is multi-step) and also ends on `/otp`. Mock implements all of it
+(`app/api/mock/auth/**`); live needs the routes below. Until they exist, live-mode sign-in
+404s — the FE shows a friendly message and the deployed app defaults to Demo data.
+
+| # | Endpoint | Contract | Notes |
+|---|---|---|---|
+| A1 | `POST /auth/login` | `{email,password}` → `202 {sent:true, role:"seller"\|"buyer"}` + OTP emailed; `401` generic `"Invalid email or password"` (don't leak which account exists) | password checked against `Seller.passwordHash` **or** `Buyer.passwordHash`; seller wins when both exist |
+| A2 | `POST /auth/otp/verify` | `{email,code}` → `200 {token, role}` — role of whichever account owns the email; keep existing OTP rules (attempts ≤5, 10-min expiry, rate limits) | FE stores the token, clears pending state, redirects to `next` |
+| A3 | `POST /auth/buyer/register` | `{name,email,password≥8}` → `202` + OTP; `409` duplicate | buyer OTP-verify **auto-create is dead** — buyers now register with a password |
+| A4 | `POST /auth/seller/register` | **breaking**: today `201 {token, seller, reserved_account}` → must return `202 {sent:true}` + OTP (no token until A2) | FE already treats `token` as optional in the response |
+| A5 | Prisma migration | `Buyer.passwordHash String?`, `Buyer.name String?` | A1 can't check a password that isn't stored; A3 has nowhere to put `name` |
+| A6 | OTP resend | keep `POST /auth/buyer/otp/request` as-is (it's role-agnostic — just an OTP row keyed by email), or rename to `/auth/otp/request` | the `/otp` page resend button calls it for both roles |
+
+**Deprecated (FE no longer calls; keep working so scripts don't break):**
+`POST /auth/seller/login` (token-direct), `POST /auth/buyer/otp/verify` (buyer-only token).
+`scripts/phase-b.ts` still drives A6 + the old buyer verify directly.
+
 ---
 
 ## 2. Response-shape adjustments requested
@@ -198,9 +220,10 @@ Legend: ✅ exists & wired · ⚠️ exists with gaps (item id) · ❌ missing �
 
 | Capability | FE consumer | mock API | v1 API | Notes |
 |---|---|---|---|---|
-| Seller register | ✓ | ✅ | ⚠️ V5 | FE sends bvn/settlement in live mode |
-| Seller login | ✓ | ✅ | ✅ | |
-| OTP request/verify | ✓ | ✅ (`dev_code` + card banner) | ✅ live sends SMTP email (nodemailer) — `SMTP_*` env required | |
+| Seller register | ✓ (multi-step `/signup/seller`) | ✅ `202 + OTP` (§1.4 A4) | ⚠️ V5 + §1.4 A4 | v1 still returns a token directly |
+| Seller login (password, token-direct) | **—** (replaced by Auth v2) | ✅ kept for scripts | ✅ kept for scripts | FE uses `POST /auth/login` now |
+| **Auth v2**: `POST /auth/login` + `otp/verify` + `buyer/register` | ✓ (single sign-in form, shared `/otp`) | ✅ | ❌ §1.4 (A1–A5) | live auth 404s until BE ships §1.4 — deployed default is Demo data |
+| OTP request/verify (legacy buyer flow) | ✓ resend only | ✅ (`dev_code` + card banner) | ✅ live sends SMTP email (nodemailer) — `SMTP_*` env required | verify issues buyer-only token; FE uses A2 instead |
 | `GET /auth/me` | ✓ | ✅ | ⚠️ R5 | |
 | Dashboard | ✓ | ✅ | ⚠️ R6 | |
 | Orders list | ✓ (seller + buyer) | ✅ (buyer scope added) | ⚠️ R1 | |
@@ -220,7 +243,9 @@ Legend: ✅ exists & wired · ⚠️ exists with gaps (item id) · ❌ missing �
 **Mock-only features the FE depends on** (must not regress when v1 gains them): invoice share
 links, display-status vocabulary, `frozen` payout status, buyer email on orders, top-level
 `reserved_account` on `/auth/me`, snake_case product fields, code-based demo seeding of
-sellers/orders/products/invoices (SQLite, no data files — any fresh instance self-seeds).
+sellers/orders/products/invoices (SQLite, no data files — any fresh instance self-seeds),
+passworded demo buyer accounts (`demo1234`), role-agnostic `POST /auth/otp/verify`,
+`dev_code` delivery on every Auth v2 step.
 
 ---
 

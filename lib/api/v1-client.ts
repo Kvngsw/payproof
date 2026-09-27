@@ -14,6 +14,15 @@ const AUTH = "/api/v1/auth";
 const API = "/api/v1";
 
 async function handleResponse(res: Response) {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    // Unmatched route → Next serves an HTML 404/500 page, not a JSON error.
+    throw new Error(
+      res.status === 404
+        ? "This isn't available on the Live API yet — switch the data source to Demo data."
+        : `Request failed (${res.status})`,
+    );
+  }
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.error?.message || "Request failed");
@@ -214,6 +223,42 @@ export async function loginSeller(payload: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+  const data = await handleResponse(res);
+  if (data.token) setToken(data.token);
+  return data;
+}
+
+// Auth v2 (docs/api-requests.md §1.4 — not shipped by BE yet):
+// live mode 404s on these until the backend implements them; the FE surfaces
+// the error and the deployed demo runs on Demo data (mock) by default.
+export async function login(payload: { email: string; password: string }) {
+  const res = await fetch(`${AUTH}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}
+
+export async function registerBuyer(payload: {
+  name: string;
+  email: string;
+  password: string;
+}) {
+  const res = await fetch(`${AUTH}/buyer/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}
+
+export async function verifyAuthOtp(email: string, code: string) {
+  const res = await fetch(`${AUTH}/otp/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
   });
   const data = await handleResponse(res);
   if (data.token) setToken(data.token);

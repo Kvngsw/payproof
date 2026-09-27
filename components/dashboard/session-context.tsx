@@ -50,7 +50,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       if (!getToken()) {
         if (!cancelled) setState({ status: "error" });
         toast.error("Please sign in to access the dashboard");
-        router.replace("/signin");
+        router.replace(signinUrl());
         return;
       }
 
@@ -63,8 +63,16 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         if (cancelled) return;
         setState({ status: "error" });
         toast.error("Your session expired. Please sign in again.");
-        router.replace("/signin");
+        router.replace(signinUrl());
       }
+    }
+
+    function signinUrl() {
+      const next =
+        typeof window === "undefined"
+          ? "/dashboard"
+          : window.location.pathname + window.location.search;
+      return `/signin?next=${encodeURIComponent(next)}`;
     }
 
     load();

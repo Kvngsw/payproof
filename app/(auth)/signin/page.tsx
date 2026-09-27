@@ -7,26 +7,16 @@ import { IconShieldCheck } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { PasswordInput } from "@/components/auth/password-input";
 import { DashedLine } from "@/components/auth/dashed-line";
 import { DataSourceToggle } from "@/components/dashboard/data-source-switch";
-import { cn } from "@/lib/utils";
-import { loginSeller, requestOtp, verifyOtp } from "@/lib/api";
+import { login } from "@/lib/api";
+import { setPendingAuth, safeNext } from "@/lib/auth-pending";
 import { toast } from "sonner";
-
-type Role = "seller" | "buyer";
 
 export default function SigninPage() {
   const router = useRouter();
-  const [role, setRole] = useState<Role>("seller");
   const [loading, setLoading] = useState(false);
-
-  // Buyer OTP flow state
-  const [buyerEmail, setBuyerEmail] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
-  const [devCodeBanner, setDevCodeBanner] = useState<string | null>(null);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,37 +24,19 @@ export default function SigninPage() {
 
     try {
       const formData = new FormData(event.currentTarget);
+      const email = formData.get("email") as string;
+      const password = formData.get("password") as string;
+      const params = new URLSearchParams(window.location.search);
+      const next = safeNext(params.get("next") ?? undefined);
 
-      if (role === "seller") {
-        const email = formData.get("email") as string;
-        const password = formData.get("password") as string;
-
-        await loginSeller({ email, password });
-        toast.success("Signed in successfully!");
-        router.push("/dashboard");
-      } else {
-        if (!otpSent) {
-          const email = formData.get("email") as string;
-          setBuyerEmail(email);
-          const res = await requestOtp(email);
-          setOtpSent(true);
-          if (res.dev_code) {
-            setDevCodeBanner(res.dev_code);
-          } else {
-            toast.success("OTP sent to your email!");
-          }
-        } else {
-          if (!/^\d{6}$/.test(otpCode)) {
-            toast.error("Enter the 6-digit code");
-            return;
-          }
-          await verifyOtp(buyerEmail, otpCode);
-          toast.success("Signed in successfully!");
-          router.push("/dashboard");
-        }
+      const res = await login({ email, password });
+      setPendingAuth({ email, purpose: "login", next, dev_code: res.dev_code });
+      if (!res.dev_code) {
+        toast.success("Code sent to your email!");
       }
-    } catch (err: any) {
-      toast.error(err.message || "An error occurred");
+      router.push("/otp");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setLoading(false);
     }
@@ -88,34 +60,6 @@ export default function SigninPage() {
         <DashedLine />
 
         <form onSubmit={onSubmit} className="flex flex-col gap-5 px-6 py-6">
-          <div
-            role="group"
-            aria-label="Sign in type"
-            className="grid grid-cols-2 gap-1 rounded-3xl bg-secondary p-1"
-          >
-            {(["seller", "buyer"] as const).map((value) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={role === value}
-                onClick={() => {
-                  setRole(value);
-                  setOtpSent(false);
-                  setOtpCode("");
-                  setDevCodeBanner(null);
-                }}
-                className={cn(
-                  "inline-flex h-9 items-center justify-center rounded-full text-sm font-medium transition-[color,background-color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
-                  role === value
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {value === "seller" ? "Seller sign in" : "Buyer sign in"}
-              </button>
-            ))}
-          </div>
-
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-medium text-muted-foreground">
               Data source
@@ -124,95 +68,44 @@ export default function SigninPage() {
           </div>
 
           <FieldGroup>
-            {role === "seller" ? (
-              <>
-                <Field>
-                  <FieldLabel htmlFor="email">Email</FieldLabel>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    required
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="password">Password</FieldLabel>
-                  <PasswordInput
-                    id="password"
-                    name="password"
-                    autoComplete="current-password"
-                    placeholder="Your password"
-                    required
-                  />
-                </Field>
-              </>
-            ) : !otpSent ? (
-              <Field>
-                <FieldLabel htmlFor="email">Email</FieldLabel>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="tobi@example.com"
-                  required
-                />
-                <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
-                  We will send a one-time code to your email.
-                </p>
-              </Field>
-            ) : (
-              <Field>
-                <FieldLabel htmlFor="code">One-time code</FieldLabel>
-                <InputOTP
-                  id="code"
-                  name="code"
-                  value={otpCode}
-                  onChange={setOtpCode}
-                  maxLength={6}
-                  autoComplete="one-time-code"
-                  inputMode="numeric"
-                  required
-                >
-                  <InputOTPGroup>
-                    {[0, 1, 2, 3, 4, 5].map((index) => (
-                      <InputOTPSlot key={index} index={index} />
-                    ))}
-                  </InputOTPGroup>
-                </InputOTP>
-                {devCodeBanner && (
-                  <div className="mt-2 rounded-xl border border-primary/30 bg-primary/10 p-3 text-xs text-foreground">
-                    <span className="font-bold text-primary">DEV MODE:</span> Your OTP code is{" "}
-                    <span className="font-mono font-bold">{devCodeBanner}</span>
-                  </div>
-                )}
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground text-pretty">
-                  Enter the code sent to {buyerEmail}.
-                </p>
-              </Field>
-            )}
+            <Field>
+              <FieldLabel htmlFor="email">Email</FieldLabel>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                required
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="password">Password</FieldLabel>
+              <PasswordInput
+                id="password"
+                name="password"
+                autoComplete="current-password"
+                placeholder="Your password"
+                required
+              />
+              <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
+                We&apos;ll email you a one-time code to finish signing in.
+              </p>
+            </Field>
           </FieldGroup>
 
           <Button type="submit" size="lg" className="w-full" disabled={loading}>
-            {loading
-              ? "Processing..."
-              : role === "seller"
-              ? "Sign in"
-              : !otpSent
-              ? "Send one-time code"
-              : "Verify and sign in"}
+            {loading ? "Processing..." : "Continue"}
           </Button>
         </form>
 
         <div className="border-t border-border/60 px-6 py-4 text-center text-sm text-muted-foreground">
-          Need an account?{" "}
+          New to PayProof?{" "}
           <Link
-            href="/register"
+            href="/signup"
             className="font-semibold text-primary underline-offset-4 hover:underline"
           >
-            Create one
+            Create an account
           </Link>
         </div>
       </div>

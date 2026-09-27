@@ -31,6 +31,22 @@ export function registerSeller(payload: RegisterPayload) {
   return isLive() ? live.registerSeller(payload) : mock.registerSeller(payload);
 }
 
+export function registerBuyer(payload: {
+  name: string;
+  email: string;
+  password: string;
+}) {
+  return isLive() ? live.registerBuyer(payload) : mock.registerBuyer(payload);
+}
+
+export function login(payload: { email: string; password: string }) {
+  return isLive() ? live.login(payload) : mock.login(payload);
+}
+
+export function verifyAuthOtp(email: string, code: string) {
+  return isLive() ? live.verifyAuthOtp(email, code) : mock.verifyAuthOtp(email, code);
+}
+
 export function loginSeller(payload: { email: string; password: string }) {
   return isLive() ? live.loginSeller(payload) : mock.loginSeller(payload);
 }

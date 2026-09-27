@@ -126,6 +126,14 @@ export const db = {
       rows.push(buyer);
       writeCollection("buyers", rows);
     },
+    update: (id: string, patch: any) => {
+      const rows = readCollection("buyers");
+      const row = rows.find((b) => b.id === id);
+      if (!row) return null;
+      Object.assign(row, patch);
+      writeCollection("buyers", rows);
+      return row;
+    },
   },
   orders: {
     findBySeller: (sellerId: string) => {

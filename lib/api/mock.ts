@@ -25,6 +25,38 @@ export async function registerSeller(payload: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  return handleResponse(res); // Auth v2: 202 + dev_code — no token yet
+}
+
+// Auth v2: password check for either role → OTP, token only after /otp verify.
+export async function login(payload: { email: string; password: string }) {
+  const res = await fetch(`${BASE}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}
+
+export async function registerBuyer(payload: {
+  name: string;
+  email: string;
+  password: string;
+}) {
+  const res = await fetch(`${BASE}/buyer/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res); // 202 + dev_code — no token yet
+}
+
+export async function verifyAuthOtp(email: string, code: string) {
+  const res = await fetch(`${BASE}/otp/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
   const data = await handleResponse(res);
   if (data.token) setToken(data.token);
   return data;

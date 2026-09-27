@@ -54,6 +54,34 @@ export function ensureDemoSellers() {
   }
 }
 
+function nameFromEmail(email: string) {
+  const local = email.split("@")[0];
+  return local.charAt(0).toUpperCase() + local.slice(1);
+}
+
+// Auth v2: every demo buyer (from SEED_ORDERS) can sign in with a password.
+// Backfills passwordless rows left over from the legacy OTP-only flow.
+export function ensureBuyerAccounts() {
+  const emails = Array.from(new Set(SEED_ORDERS.map((o) => o.buyer_email)));
+  for (const email of emails) {
+    const existing = db.buyers.findByEmail(email);
+    if (!existing) {
+      db.buyers.insert({
+        id: generateId(),
+        name: nameFromEmail(email),
+        email,
+        password_hash: hashPassword(DEMO_PASSWORD),
+        created_at: new Date(Date.now() - 60 * 86400_000).toISOString(),
+      });
+    } else if (!existing.password_hash) {
+      db.buyers.update(existing.id, {
+        name: existing.name ?? nameFromEmail(email),
+        password_hash: hashPassword(DEMO_PASSWORD),
+      });
+    }
+  }
+}
+
 const CHAINS: Record<string, { from: string; to: string; actor: string }[]> = {
   "Pending Payment": [],
   Cancelled: [{ from: "Pending Payment", to: "Cancelled", actor: "buyer" }],
@@ -439,6 +467,7 @@ export function ensureInvoicesForSeller(seller: any) {
 
 export function ensureDemoData() {
   ensureDemoSellers();
+  ensureBuyerAccounts();
   const seller = db.sellers.findByEmail(DEMO_SEEDED_EMAIL);
   if (!seller) return;
   ensureOrdersForSeller(seller);

@@ -84,6 +84,18 @@ Be upfront about this on stage — judges find it faster than you'd like.
 | Fraud flag | Rule-based (deviation from seller's average order value), not ML. Labelled "Rule-based" in the UI. |
 | AI assistant | Order-scoped only; cannot act on the order, only answer questions about it. |
 
+### Demo credentials (mock/demo mode)
+
+One sign-in form for both roles — email + password, then a 6-digit OTP (in demo mode the
+code is shown in the card banner on `/otp`, and the form accepts it directly).
+
+| Role | Email | Password |
+|---|---|---|
+| Seller | `ada@kicks.com` | `demo1234` |
+| Buyer | `hauwa@example.com`, `kola@example.com`, `ngozi@example.com`, `bisi@example.com`, `chidi@example.com`, `amina@example.com`, `emeka@example.com`, `zainab@example.com`, `tunde@example.com` | `demo1234` |
+
+Sign-up: `/signup` → buyer (single form) or seller (multi-step wizard) → OTP → dashboard.
+
 ---
 
 ## What doesn't work yet
