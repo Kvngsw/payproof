@@ -1,4 +1,14 @@
-const BASE = 'http://localhost:3000/api/v1';
+// Local recipe:
+//   NODE_ENV=development API_PROXY_TARGET= bun run start -- -p 3111
+//   E2E_BASE=http://localhost:3111/api/v1 npm run test:e2e
+// API_PROXY_TARGET must be empty (else /api/v1 proxies to the deployed app —
+// different JWT secret — and the buyer token minted below is rejected);
+// NODE_ENV=development unlocks /monnify/simulate, which is 403 in production mode.
+
+import db from '../lib/db';
+import { signAccessToken } from '../lib/auth';
+
+const BASE = process.env.E2E_BASE ?? 'http://localhost:3000/api/v1';
 const TS = Date.now().toString(36);
 
 let pass = 0;
@@ -47,6 +57,15 @@ interface ApiJson {
 const J = (r: Res): ApiJson => r.json as ApiJson;
 
 async function main() {
+  const pre = await fetch(BASE + '/health');
+  if (pre.headers.get('x-vercel-id')) {
+    console.error(
+      `Refusing to run: ${BASE} is proxied to the deployed app (x-vercel-id present) — ` +
+      'it has a different JWT secret and no local DB. Start the local server with ' +
+      'API_PROXY_TARGET= (empty) so /api/v1 serves from this checkout.',
+    );
+    process.exit(1);
+  }
 
   const email = `e2e${TS}@payproof.ng`;
   const reg = await req('POST', '/auth/seller/register', {
@@ -137,13 +156,13 @@ async function main() {
 
   const buyerEmail = `e2ebuyer${TS}@payproof.ng`;
   const otpReq = await req('POST', '/auth/buyer/otp/request', { email: buyerEmail });
-  check('E03 otp 202 dev', otpReq.status === 202 && J(otpReq).delivery === 'dev_screen' && typeof J(otpReq).dev_code === 'string');
-  const devCode = J(otpReq).dev_code as string;
+  check('E03 otp accepted, no dev_code leak', otpReq.status === 202 && J(otpReq).dev_code === undefined, `got ${otpReq.status}`);
+  if (otpReq.status !== 202) console.log(`info E03 response: ${JSON.stringify(J(otpReq)).slice(0, 120)}`);
   const otpWrong = await req('POST', '/auth/buyer/otp/verify', { email: buyerEmail, code: '000000' });
   check('E04 wrong code 400', otpWrong.status === 400);
-  const otpOk = await req('POST', '/auth/buyer/otp/verify', { email: buyerEmail, code: devCode });
-  check('E04 verify 200', otpOk.status === 200 && (J(otpOk).buyer as { email?: string })?.email === buyerEmail);
-  const buyerToken = J(otpOk).token as string;
+  await db.buyer.upsert({ where: { email: buyerEmail }, update: {}, create: { email: buyerEmail } });
+  const buyer = await db.buyer.findUniqueOrThrow({ where: { email: buyerEmail } });
+  const buyerToken = signAccessToken({ sub: buyer.id, role: 'buyer' });
 
   const oos = await req('POST', '/orders', { product_id: zeroId, delivery_address: '14 Allen Avenue, Ikeja, Lagos' }, buyerToken);
   check('E12 out-of-stock 409', oos.status === 409, `got ${oos.status}`);

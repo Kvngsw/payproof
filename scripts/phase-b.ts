@@ -1,7 +1,17 @@
+import readline from 'node:readline/promises';
 import db from '../lib/db';
 
 const BASE = 'https://payproof-seven.vercel.app/api/v1';
 const PRODUCT = 'Solar Desk Lamp';
+
+async function ask(prompt: string): Promise<string> {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return (await rl.question(prompt)).trim();
+  } finally {
+    rl.close();
+  }
+}
 
 async function otp(email: string): Promise<string> {
   const q = await fetch(BASE + '/auth/buyer/otp/request', {
@@ -9,15 +19,21 @@ async function otp(email: string): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email }),
   });
-  const { dev_code, delivery } = (await q.json()) as { dev_code?: string; delivery: string };
-  if (!dev_code) throw new Error('No dev_code (deploy OTP_MODE is not dev?) delivery=' + delivery);
+  const qj = (await q.json()) as { delivery?: string; dev_code?: string; error?: { message?: string } };
+  if (q.status !== 202 && !qj.dev_code) {
+    throw new Error(`OTP request failed (${q.status}): ` + JSON.stringify(qj).slice(0, 200));
+  }
+  console.log(`OTP ${qj.dev_code ? 'issued for the dev card' : `sent to ${email} — check the inbox`}.`);
+  const code = qj.dev_code ?? (await ask('Enter the 6-digit code: '));
+  if (!/^\d{6}$/.test(code)) throw new Error('Expected a 6-digit code');
   const v = await fetch(BASE + '/auth/buyer/otp/verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, code: dev_code }),
+    body: JSON.stringify({ email, code }),
   });
-  const { token } = (await v.json()) as { token: string };
-  return token;
+  const vj = (await v.json()) as { token?: string; error?: { message?: string } };
+  if (!vj.token) throw new Error('OTP verify failed: ' + JSON.stringify(vj).slice(0, 200));
+  return vj.token;
 }
 
 async function main() {
