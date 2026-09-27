@@ -26,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   createProduct,
   deleteProduct,
@@ -90,6 +91,7 @@ export default function InventoryPage() {
   const [editing, setEditing] = useState<MockProduct | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<MockProduct | null>(null);
 
   useEffect(() => {
     if (session.status !== "authed") return;
@@ -167,6 +169,7 @@ export default function InventoryPage() {
       toast.success("Product deleted");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
+      throw err;
     }
   }
 
@@ -288,7 +291,7 @@ export default function InventoryPage() {
                         <DropdownMenuItem
                           variant="destructive"
                           onSelect={() => {
-                            handleDelete(product);
+                            setPendingDelete(product);
                           }}
                         >
                           <IconTrash className="size-4" />
@@ -416,6 +419,19 @@ export default function InventoryPage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        title={pendingDelete ? `Delete ${pendingDelete.name}?` : "Delete product?"}
+        description="This removes the product from your inventory. Invoices that already reference it keep their snapshot."
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (pendingDelete) await handleDelete(pendingDelete);
+        }}
+      />
     </div>
   );
 }
