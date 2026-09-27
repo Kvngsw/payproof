@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { getOrder, type MockOrder } from "@/lib/api/mock";
+import { getOrder, type MockOrder } from "@/lib/api";
 import { useDashboardSession } from "@/components/dashboard/session-context";
 import { OrderActions } from "@/components/dashboard/order-actions";
 import { StatusChip } from "@/components/status-chip";

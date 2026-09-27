@@ -6,6 +6,7 @@ export type ErrorCode =
   | 'INVALID_TRANSITION'
   | 'OUT_OF_STOCK'
   | 'DUPLICATE'
+  | 'PRODUCT_HAS_ORDERS'
   | 'PAYOUT_FROZEN'
   | 'BAD_SIGNATURE'
   | 'RATE_LIMITED'

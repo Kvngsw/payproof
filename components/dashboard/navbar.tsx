@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { clearToken } from "@/lib/api/mock";
+import { clearToken, useDataSource } from "@/lib/api";
 import { buttonVariants } from "@/components/ui/button";
 import { IconMenu2, IconX, IconLogout2 } from "@tabler/icons-react";
 import { useDashboardSession } from "./session-context";
+import { DataSourceToggle } from "./data-source-switch";
 
 const NAV_ITEMS = [
   { label: "Home", href: "/dashboard" },
@@ -28,7 +29,12 @@ function initialsOf(name?: string, fallback?: string) {
 export function DashboardNavbar() {
   const router = useRouter();
   const session = useDashboardSession();
+  const source = useDataSource();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const navItems = NAV_ITEMS.filter(
+    (item) => source !== "live" || item.href !== "/dashboard/invoices",
+  );
 
   const profile = session.status === "authed" ? session.data.profile : null;
   const displayName =
@@ -54,7 +60,7 @@ export function DashboardNavbar() {
           </Link>
 
           <ul className="hidden items-center gap-6 sm:flex">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <li key={item.href}>
                 <Link
                   href={item.href}
@@ -67,6 +73,7 @@ export function DashboardNavbar() {
           </ul>
 
           <div className="hidden items-center gap-3 sm:flex">
+            <DataSourceToggle reload />
             <div className="flex items-center gap-2.5">
               <span className="grid size-8 place-items-center rounded-full border border-border/60 bg-muted text-xs font-semibold">
                 {initialsOf(profile?.name, profile?.business_name)}
@@ -132,7 +139,7 @@ export function DashboardNavbar() {
         inert={!menuOpen}
       >
         <div className="flex h-full flex-col items-start justify-center gap-8 px-8">
-          {NAV_ITEMS.map((item, index) => (
+          {navItems.map((item, index) => (
             <Link
               key={item.href}
               href={item.href}
@@ -155,8 +162,9 @@ export function DashboardNavbar() {
                 ? "translate-y-0 opacity-100"
                 : "translate-y-3 opacity-0",
             )}
-            style={{ transitionDelay: menuOpen ? "100ms" : "0ms" }}
+            style={{ transitionDelay: "100ms" }}
           >
+            <DataSourceToggle reload />
             <div className="flex items-center gap-2.5">
               <span className="grid size-8 place-items-center rounded-full border border-border/60 bg-muted text-xs font-semibold">
                 {initialsOf(profile?.name, profile?.business_name)}

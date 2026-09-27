@@ -8,6 +8,7 @@ import {
   unauthorized,
   forbidden,
   notFound,
+  conflict,
   handleError,
 } from '@/lib/api-response';
 
@@ -71,5 +72,36 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return ok(updated);
   } catch (err) {
     return handleError(err, 'PATCH /api/v1/products/[id]', requestId);
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: Params) {
+  const requestId = getRequestId(request);
+
+  try {
+    const claims = authenticate(request);
+    if (!claims) return unauthorized();
+    if (claims.role !== 'seller') return forbidden('Only sellers can delete products.');
+
+    const { id } = await params;
+    const product = await db.product.findUnique({ where: { id } });
+    if (!product) return notFound('Product');
+
+    if (product.sellerId !== String(claims.sub)) {
+      return forbidden('You can only delete your own products.');
+    }
+
+    const orderCount = await db.order.count({ where: { productId: id } });
+    if (orderCount > 0) {
+      return conflict(
+        'This product has orders and cannot be deleted. Archive it instead.',
+        'PRODUCT_HAS_ORDERS',
+      );
+    }
+
+    await db.product.delete({ where: { id } });
+    return ok({ ok: true });
+  } catch (err) {
+    return handleError(err, 'DELETE /api/v1/products/[id]', requestId);
   }
 }

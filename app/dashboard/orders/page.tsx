@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { listOrders, type MockOrder } from "@/lib/api/mock";
+import { listOrders, type MockOrder } from "@/lib/api";
 import { useDashboardSession } from "@/components/dashboard/session-context";
 import { OrdersTable } from "@/components/dashboard/orders-table";
 import { IconReceiptOff } from "@tabler/icons-react";

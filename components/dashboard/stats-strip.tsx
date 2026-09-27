@@ -6,7 +6,7 @@ import {
   IconCircleCheck,
   type Icon,
 } from "@tabler/icons-react";
-import type { CountsByStatus } from "@/lib/api/mock";
+import type { CountsByStatus } from "@/lib/api";
 
 const STATUS_ORDER: { key: string; label: string }[] = [
   { key: "Awaiting Shipment", label: "awaiting" },

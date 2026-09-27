@@ -32,7 +32,7 @@ import {
   listProducts,
   updateProduct,
   type MockProduct,
-} from "@/lib/api/mock";
+} from "@/lib/api";
 import { useDashboardSession } from "@/components/dashboard/session-context";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
 import { Amount } from "@/components/amount";

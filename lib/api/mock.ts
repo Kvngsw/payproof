@@ -1,19 +1,7 @@
 const BASE = "/api/mock/auth";
 
-export function getToken() {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("pp_token");
-}
-
-export function setToken(token: string) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("pp_token", token);
-}
-
-export function clearToken() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem("pp_token");
-}
+export { getToken, setToken, clearToken } from "./source";
+import { getToken, setToken } from "./source";
 
 async function handleResponse(res: Response) {
   const data = await res.json();
@@ -29,6 +17,8 @@ export async function registerSeller(payload: {
   password: string;
   phone: string;
   business_name: string;
+  bvn?: string;
+  settlement?: { bankCode: string; accountNumber: string };
 }) {
   const res = await fetch(`${BASE}/seller/register`, {
     method: "POST",

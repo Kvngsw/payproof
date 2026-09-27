@@ -9,7 +9,7 @@ import {
   listInvoices,
   type SellerDashboard,
   type MockInvoice,
-} from "@/lib/api/mock";
+} from "@/lib/api";
 import { StatsStrip } from "@/components/dashboard/stats-strip";
 import { InvoiceStatusChip } from "@/components/dashboard/invoice-status-chip";
 import { Amount } from "@/components/amount";
@@ -21,6 +21,8 @@ import {
   IconCalendar,
 } from "@tabler/icons-react";
 import { useDashboardSession } from "@/components/dashboard/session-context";
+import { useDataSource } from "@/lib/api";
+import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 
 function PayoutLine({
   account,
@@ -164,6 +166,7 @@ function SellerDetailsCard({
 export default function DashboardPage() {
   const router = useRouter();
   const session = useDashboardSession();
+  const source = useDataSource();
   const [dashboard, setDashboard] = useState<SellerDashboard | null>(null);
   const [statsFailed, setStatsFailed] = useState(false);
   const [invoices, setInvoices] = useState<MockInvoice[] | null>(null);
@@ -233,10 +236,12 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => router.push("/dashboard/invoices/new")}>
-            <IconPlus className="size-4" />
-            New invoice
-          </Button>
+          {source === "mock" && (
+            <Button onClick={() => router.push("/dashboard/invoices/new")}>
+              <IconPlus className="size-4" />
+              New invoice
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={() => router.push("/dashboard/inventory")}
@@ -278,7 +283,11 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="pt-2">
-            <RecentInvoices invoices={invoices} />
+            {source === "live" ? (
+              <DemoDataNotice compact />
+            ) : (
+              <RecentInvoices invoices={invoices} />
+            )}
           </div>
         </section>
         <SellerDetailsCard profile={profile} />

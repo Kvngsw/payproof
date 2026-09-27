@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { getMe, getToken } from "@/lib/api/mock";
+import { getMe, getToken } from "@/lib/api";
 
 export type MeResponse = {
   role: "seller" | "buyer";
