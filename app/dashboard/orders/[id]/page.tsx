@@ -169,9 +169,9 @@ export default function OrderDetailPage() {
     };
   }, [session.status, params.id]);
 
-  // Buyer view stays fresh while the order is still moving (board FE-11)
+  // Order detail stays fresh while the order is still moving (board FE-11)
   useEffect(() => {
-    if (!isBuyer || !order || !LIVE_STATUSES.has(order.status)) return;
+    if (!order || !LIVE_STATUSES.has(order.status)) return;
     const timer = setInterval(() => {
       getOrder(params.id)
         .then((data) => setOrder(data))
@@ -180,7 +180,7 @@ export default function OrderDetailPage() {
         });
     }, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [isBuyer, order, params.id]);
+  }, [order, params.id]);
 
   const loading = session.status === "loading" || (order === null && !failed);
 
@@ -252,12 +252,6 @@ export default function OrderDetailPage() {
           </span>
         )}
       </header>
-
-      {isBuyer ? (
-        <BuyerOrderActions order={order} onUpdated={setOrder} />
-      ) : (
-        <OrderActions order={order} onUpdated={setOrder} />
-      )}
 
       {order.status === "Disputed" && (
         <div className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -335,6 +329,17 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="space-y-6">
+          <section>
+            <SectionHeading>Actions</SectionHeading>
+            <div className="mt-2">
+              {isBuyer ? (
+                <BuyerOrderActions order={order} onUpdated={setOrder} />
+              ) : (
+                <OrderActions order={order} onUpdated={setOrder} />
+              )}
+            </div>
+          </section>
+
           <section>
             <SectionHeading>Payment &amp; payout</SectionHeading>
             <dl className="mt-2">

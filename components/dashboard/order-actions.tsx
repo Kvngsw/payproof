@@ -188,7 +188,7 @@ export function OrderActions({
   if (!hint) return null;
 
   return (
-    <p className="flex items-center gap-1.5 text-sm text-muted-foreground sm:ml-auto">
+    <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
       {order.status === "Completed" ? (
         <IconCheck className="size-4 text-primary" />
       ) : null}

@@ -239,7 +239,7 @@ Legend: ✅ exists & wired · ⚠️ exists with gaps (item id) · ❌ missing �
 | Orders list | ✓ (seller + buyer) | ✅ (buyer scope added) | ⚠️ R1 | |
 | Order detail | ✓ (seller + buyer) | ✅ (buyer scope added) | ⚠️ R3, R4 | |
 | Ship / tracking | ✓ | ✅ | ⚠️ R2, V6 | |
-| Orders: cancel / confirm-delivery / report-issue / verify / payout / create | ✓ buyer UI | ✅ (parity pass) | ✅ | buyer actions on order detail (status-gated, polling while active) |
+| Orders: cancel / confirm-delivery / report-issue / verify / payout / create | ✓ buyer UI | ✅ (parity pass) | ✅ | role-aware actions in the payment column of order detail; both roles poll while active |
 | Products list | ✓ | ✅ | ⚠️ R7, R8 | |
 | Products create/patch | ✓ | ✅ | ⚠️ V1–V4 | |
 | Products **delete** | ✓ | ✅ | ✅ §1.2 (handler shipped in this repo) | returns `409 PRODUCT_HAS_ORDERS` when referenced |
