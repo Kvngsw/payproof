@@ -1,5 +1,3 @@
-import { getDb } from "./db";
-
 export function issueToken(payload: { sub: string; role: "seller" | "buyer"; name: string; email: string }) {
   return Buffer.from(JSON.stringify({ ...payload, exp: Date.now() + 86400000 })).toString("base64");
 }

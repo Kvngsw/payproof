@@ -1,5 +1,4 @@
-import fs from "node:fs";
-import { ensureCollectionFiles, db, collectionFile } from "../lib/mock/store";
+import { ensureCollectionFiles, db, readCollection } from "../lib/mock/store";
 import {
   ensureDemoSellers,
   ensureOrdersForSeller,
@@ -24,10 +23,9 @@ const names = [
   "products",
   "invoices",
 ] as const;
-console.log("mock-data/ ready (additive — other records untouched):");
+console.log("mock-data ready (SQLite — additive, other records untouched):");
 for (const name of names) {
-  const rows = JSON.parse(fs.readFileSync(collectionFile(name), "utf-8"));
-  console.log(`  ${name}.json: ${rows.length} rows`);
+  console.log(`  ${name}: ${readCollection(name).length} rows`);
 }
 console.log(
   `  demo seller: ${DEMO_SEEDED_EMAIL} / demo1234 (orders seeded on first run only)`,

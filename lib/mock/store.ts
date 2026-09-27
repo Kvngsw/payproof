@@ -1,6 +1,8 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import crypto from "node:crypto";
+import { DatabaseSync } from "node:sqlite";
 
 const DATA_DIR = path.join(process.cwd(), "mock-data");
 
@@ -18,33 +20,97 @@ export function collectionFile(name: CollectionName) {
   return path.join(DATA_DIR, `${name}.json`);
 }
 
-export function readCollection(name: CollectionName): any[] {
+// ---------------------------------------------------------------------------
+// Storage: SQLite (node:sqlite, built-in). Rows live as JSON documents so the
+// repository below keeps its exact in-memory filtering semantics. Falls back
+// to /tmp when the project directory is read-only (deployed/serverless).
+// ---------------------------------------------------------------------------
+
+let sql: DatabaseSync | null = null;
+
+function resolveDbPath(): string {
   try {
-    const file = collectionFile(name);
-    if (fs.existsSync(file)) {
-      const parsed = JSON.parse(fs.readFileSync(file, "utf-8"));
-      return Array.isArray(parsed) ? parsed : [];
-    }
-  } catch {}
-  return [];
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const probe = path.join(DATA_DIR, ".write-probe");
+    fs.writeFileSync(probe, "1");
+    fs.unlinkSync(probe);
+    return path.join(DATA_DIR, "mock.db");
+  } catch {
+    return path.join(os.tmpdir(), "payproof-mock.db");
+  }
 }
 
-export function writeCollection(name: CollectionName, rows: any[]) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(
-    collectionFile(name),
-    JSON.stringify(rows, null, 2) + "\n",
-    "utf-8",
+function getSql(): DatabaseSync {
+  if (sql) return sql;
+  const db = new DatabaseSync(resolveDbPath());
+  db.exec("PRAGMA busy_timeout = 5000");
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mock_rows (
+      collection TEXT NOT NULL,
+      seq INTEGER PRIMARY KEY AUTOINCREMENT,
+      data TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_mock_rows_collection ON mock_rows(collection);
+    CREATE TABLE IF NOT EXISTS mock_meta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+  sql = db;
+  importLegacyJsonOnce(db);
+  return db;
+}
+
+function importLegacyJsonOnce(db: DatabaseSync) {
+  const marker = db.prepare("SELECT value FROM mock_meta WHERE key = ?").get("json_imported");
+  if (marker) return;
+  for (const name of COLLECTIONS) {
+    let rows: any[] = [];
+    try {
+      const file = collectionFile(name);
+      if (fs.existsSync(file)) {
+        const parsed = JSON.parse(fs.readFileSync(file, "utf-8"));
+        if (Array.isArray(parsed)) rows = parsed;
+      }
+    } catch {}
+    if (rows.length > 0) {
+      const ins = db.prepare("INSERT INTO mock_rows (collection, data) VALUES (?, ?)");
+      for (const row of rows) ins.run(name, JSON.stringify(row));
+    }
+  }
+  db.prepare("INSERT OR REPLACE INTO mock_meta (key, value) VALUES (?, ?)").run(
+    "json_imported",
+    "1",
   );
 }
 
-export function ensureCollectionFiles() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  for (const name of COLLECTIONS) {
-    if (!fs.existsSync(collectionFile(name))) {
-      fs.writeFileSync(collectionFile(name), "[]\n", "utf-8");
-    }
+export function readCollection(name: CollectionName): any[] {
+  try {
+    const rows = getSql()
+      .prepare("SELECT data FROM mock_rows WHERE collection = ? ORDER BY seq")
+      .all(name);
+    return rows.map((row) => JSON.parse(String(row.data)));
+  } catch {
+    return [];
   }
+}
+
+export function writeCollection(name: CollectionName, rows: any[]) {
+  const db = getSql();
+  db.exec("BEGIN");
+  try {
+    db.prepare("DELETE FROM mock_rows WHERE collection = ?").run(name);
+    const ins = db.prepare("INSERT INTO mock_rows (collection, data) VALUES (?, ?)");
+    for (const row of rows) ins.run(name, JSON.stringify(row));
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+}
+
+export function ensureCollectionFiles() {
+  getSql();
 }
 
 export function generateId() {
