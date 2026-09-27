@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import { db, generateId, hashPassword } from "@/lib/mock/store";
-import { ensureDemoData } from "@/lib/mock/seed";
 import { issueOtp } from "@/lib/mock/otp";
+import {
+  isReadOnly,
+  readOnlyResponse,
+  READ_ONLY_REGISTER_MESSAGE,
+} from "@/lib/mock/read-only";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  if (isReadOnly()) return readOnlyResponse(READ_ONLY_REGISTER_MESSAGE);
   try {
     const body = await request.json();
     const { name, email, password, phone, business_name } = body;
@@ -17,7 +22,6 @@ export async function POST(request: Request) {
       );
     }
 
-    ensureDemoData();
     const existing = db.sellers.findByEmail(email);
     if (existing) {
       return NextResponse.json(

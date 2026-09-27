@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { db, generateId, hashPassword } from "@/lib/mock/store";
 import { issueOtp } from "@/lib/mock/otp";
+import {
+  isReadOnly,
+  readOnlyResponse,
+  READ_ONLY_REGISTER_MESSAGE,
+} from "@/lib/mock/read-only";
 
 export const dynamic = "force-dynamic";
 
 // Auth v2: buyer account creation with a password, OTP confirms the email.
 export async function POST(request: Request) {
+  if (isReadOnly()) return readOnlyResponse(READ_ONLY_REGISTER_MESSAGE);
   try {
     const body = await request.json();
     const { name, email, password } = body;

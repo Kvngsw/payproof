@@ -102,6 +102,3 @@ lib-cov/
 .lock-wscript
 .nuxt/
 .vuepress/dist
-
-# ─── Mock API local database ────────────────────────────
-mock-data/

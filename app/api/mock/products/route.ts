@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/mock/auth";
 import { db, generateId } from "@/lib/mock/store";
-import { ensureDemoSellers, ensureProductsForSeller } from "@/lib/mock/seed";
+import {
+  isReadOnly,
+  readOnlyResponse,
+  READ_ONLY_ACTION_MESSAGE,
+} from "@/lib/mock/read-only";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +20,6 @@ export async function GET(request: Request) {
     );
   }
 
-  ensureDemoSellers();
   const seller = db.sellers.findById(user.sub);
   if (!seller) {
     return NextResponse.json(
@@ -25,8 +28,6 @@ export async function GET(request: Request) {
     );
   }
 
-  ensureProductsForSeller(seller);
-
   const products = db.products
     .findBySeller(seller.id)
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
@@ -34,6 +35,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (isReadOnly()) return readOnlyResponse(READ_ONLY_ACTION_MESSAGE);
   const authHeader = request.headers.get("authorization");
   const user = verifyToken(authHeader);
 

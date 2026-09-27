@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/mock/auth";
 import { db } from "@/lib/mock/store";
-import {
-  ensureDemoSellers,
-  ensureOrdersForSeller,
-  ORDER_STATUSES,
-} from "@/lib/mock/seed";
+import { ORDER_STATUSES } from "@/lib/mock/seed";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +16,6 @@ export async function GET(request: Request) {
     );
   }
 
-  ensureDemoSellers();
   const seller = db.sellers.findById(user.sub);
   if (!seller) {
     return NextResponse.json(
@@ -29,7 +24,6 @@ export async function GET(request: Request) {
     );
   }
 
-  ensureOrdersForSeller(seller);
   const orders = db.orders.findBySeller(seller.id);
 
   const counts_by_status: Record<string, number> = {};

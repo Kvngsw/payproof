@@ -20,7 +20,7 @@
     "seed": "tsx lib/seed.ts",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "seed:demo": "tsx scripts/seed-demo.ts"
+    "mock:data": "tsx scripts/generate-mock-data.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

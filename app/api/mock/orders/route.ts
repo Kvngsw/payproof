@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/mock/auth";
 import { db, readCollection } from "@/lib/mock/store";
-import {
-  ensureDemoSellers,
-  ensureOrdersForSeller,
-  ensureDemoData,
-} from "@/lib/mock/seed";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +16,6 @@ export async function GET(request: Request) {
   }
 
   if (user.role === "buyer") {
-    ensureDemoData();
-
     const status = new URL(request.url).searchParams.get("status");
     let orders = readCollection("orders").filter(
       (o) => !o.buyer_email || o.buyer_email === user.email,
@@ -42,7 +35,6 @@ export async function GET(request: Request) {
     return NextResponse.json(withSeller);
   }
 
-  ensureDemoSellers();
   const seller = db.sellers.findById(user.sub);
   if (!seller) {
     return NextResponse.json(
@@ -50,8 +42,6 @@ export async function GET(request: Request) {
       { status: 404 }
     );
   }
-
-  ensureOrdersForSeller(seller);
 
   const status = new URL(request.url).searchParams.get("status");
   let orders = db.orders.findBySeller(seller.id);

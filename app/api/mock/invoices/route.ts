@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/mock/auth";
 import { db, generateInvoiceCode } from "@/lib/mock/store";
-import { ensureInvoicesForSeller } from "@/lib/mock/seed";
+import {
+  isReadOnly,
+  readOnlyResponse,
+  READ_ONLY_ACTION_MESSAGE,
+} from "@/lib/mock/read-only";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +26,6 @@ export async function GET(request: Request) {
     );
   }
 
-  ensureInvoicesForSeller(seller);
   const invoices = db.invoices
     .findBySeller(seller.id)
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
@@ -30,6 +33,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (isReadOnly()) return readOnlyResponse(READ_ONLY_ACTION_MESSAGE);
   const user = verifyToken(request.headers.get("authorization"));
   if (!user || user.role !== "seller") {
     return NextResponse.json(

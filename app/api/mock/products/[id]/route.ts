@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/mock/auth";
 import { db } from "@/lib/mock/store";
+import {
+  isReadOnly,
+  readOnlyResponse,
+  READ_ONLY_ACTION_MESSAGE,
+} from "@/lib/mock/read-only";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +19,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (isReadOnly()) return readOnlyResponse(READ_ONLY_ACTION_MESSAGE);
   const seller = requireSeller(request);
   if (!seller) {
     return NextResponse.json(
@@ -79,6 +85,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (isReadOnly()) return readOnlyResponse(READ_ONLY_ACTION_MESSAGE);
   const seller = requireSeller(request);
   if (!seller) {
     return NextResponse.json(

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, generateId } from "@/lib/mock/store";
+import { issueOtp } from "@/lib/mock/otp";
 
 export const dynamic = "force-dynamic";
 
@@ -15,18 +15,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const id = generateId();
-    const expires_at = Date.now() + 600000; // 10 mins
-
-    db.otps.insert({
-      id,
-      email,
-      code,
-      expires_at,
-      attempts: 0,
-      used_at: null,
-    });
+    const code = issueOtp(email);
 
     return NextResponse.json(
       {

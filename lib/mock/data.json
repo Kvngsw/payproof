@@ -1,0 +1,821 @@
+{
+  "sellers": [
+    {
+      "id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "email": "ada@kicks.com",
+      "password_hash": "ZGVtbzEyMzQ=",
+      "name": "Ada Obi",
+      "phone": "08000000000",
+      "business_name": "Ada Kicks",
+      "reserved_account_number": "9940294931",
+      "reserved_bank": "Wema Bank",
+      "reserved_account_name": "PP-ADA KICKS",
+      "created_at": "2026-06-29T20:20:28.721Z",
+      "seeded_demo": true
+    }
+  ],
+  "buyers": [
+    {
+      "id": "581779d4-4757-4758-afeb-34e8fd424df3",
+      "name": "Bisi",
+      "email": "bisi@example.com",
+      "password_hash": "ZGVtbzEyMzQ=",
+      "created_at": "2026-07-29T20:20:28.722Z"
+    },
+    {
+      "id": "04b3b0a3-cafc-4ea9-98d5-06d37c770935",
+      "name": "Chidi",
+      "email": "chidi@example.com",
+      "password_hash": "ZGVtbzEyMzQ=",
+      "created_at": "2026-07-29T20:20:28.723Z"
+    },
+    {
+      "id": "7be53f99-d83a-400f-8fed-12fe44a59453",
+      "name": "Amina",
+      "email": "amina@example.com",
+      "password_hash": "ZGVtbzEyMzQ=",
+      "created_at": "2026-07-29T20:20:28.724Z"
+    },
+    {
+      "id": "3c7a3304-ec0e-40a2-a38d-bf32832f34dd",
+      "name": "Emeka",
+      "email": "emeka@example.com",
+      "password_hash": "ZGVtbzEyMzQ=",
+      "created_at": "2026-07-29T20:20:28.724Z"
+    },
+    {
+      "id": "038225cb-88d3-4c56-b6c8-757676af48ba",
+      "name": "Zainab",
+      "email": "zainab@example.com",
+      "password_hash": "ZGVtbzEyMzQ=",
+      "created_at": "2026-07-29T20:20:28.725Z"
+    },
+    {
+      "id": "c5df05ba-2b20-471f-9238-bcdf93ce6370",
+      "name": "Tunde",
+      "email": "tunde@example.com",
+      "password_hash": "ZGVtbzEyMzQ=",
+      "created_at": "2026-07-29T20:20:28.725Z"
+    },
+    {
+      "id": "1d86d575-0299-42be-bcb1-1f6f2ae209c5",
+      "name": "Ngozi",
+      "email": "ngozi@example.com",
+      "password_hash": "ZGVtbzEyMzQ=",
+      "created_at": "2026-07-29T20:20:28.726Z"
+    },
+    {
+      "id": "17a9d180-8970-4445-a43a-3b36b99aba9c",
+      "name": "Kola",
+      "email": "kola@example.com",
+      "password_hash": "ZGVtbzEyMzQ=",
+      "created_at": "2026-07-29T20:20:28.726Z"
+    },
+    {
+      "id": "c148253e-6928-4074-84ad-d496871d61d7",
+      "name": "Hauwa",
+      "email": "hauwa@example.com",
+      "password_hash": "ZGVtbzEyMzQ=",
+      "created_at": "2026-07-29T20:20:28.727Z"
+    }
+  ],
+  "otp_codes": [],
+  "orders": [
+    {
+      "id": "3407f20b-3e78-40c6-bc85-21f1ea759830",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "buyer_email": "bisi@example.com",
+      "status": "Completed",
+      "product": {
+        "id": "59abeb56-c143-4934-a496-8e2b97bc696a",
+        "name": "Air Runner Sneakers",
+        "image_url": ""
+      },
+      "amounts": {
+        "product_kobo": 4500000,
+        "dispatch_fee_kobo": 250000,
+        "total_kobo": 4750000
+      },
+      "delivery_days": 3,
+      "delivery_address": "14 Bode Thomas St, Surulere, Lagos",
+      "tracking": {
+        "status": "Delivered",
+        "number": "PP-TRK-100000",
+        "source": "manual",
+        "label": "Manually updated by seller"
+      },
+      "payment": {
+        "reference": "pp_ord_0001",
+        "provider": "paystack",
+        "verification_mode": "live",
+        "paid_at": "2026-08-28T21:20:28.728Z"
+      },
+      "payout": {
+        "status": "paid"
+      },
+      "fraud_flag": {
+        "triggered": false,
+        "state": "insufficient_history",
+        "label": "Rule-based"
+      },
+      "events": [
+        {
+          "from": "Pending Payment",
+          "to": "Paid",
+          "actor": "system",
+          "at": "2026-08-29T20:20:28.728Z",
+          "note": null
+        },
+        {
+          "from": "Paid",
+          "to": "Awaiting Shipment",
+          "actor": "system",
+          "at": "2026-08-30T20:20:28.728Z",
+          "note": null
+        },
+        {
+          "from": "Awaiting Shipment",
+          "to": "Shipped",
+          "actor": "seller",
+          "at": "2026-08-31T20:20:28.728Z",
+          "note": null
+        },
+        {
+          "from": "Shipped",
+          "to": "Delivered",
+          "actor": "seller",
+          "at": "2026-09-01T20:20:28.728Z",
+          "note": null
+        },
+        {
+          "from": "Delivered",
+          "to": "Completed",
+          "actor": "buyer",
+          "at": "2026-09-02T20:20:28.728Z",
+          "note": null
+        }
+      ],
+      "created_at": "2026-08-28T20:20:28.728Z",
+      "updated_at": "2026-09-02T20:20:28.728Z"
+    },
+    {
+      "id": "9f829c07-8009-4d52-a022-8170f156f7eb",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "buyer_email": "chidi@example.com",
+      "status": "Completed",
+      "product": {
+        "id": "335f5833-6557-46a3-9844-5d0d301b44ca",
+        "name": "Court Classic Loafers",
+        "image_url": ""
+      },
+      "amounts": {
+        "product_kobo": 3200000,
+        "dispatch_fee_kobo": 250000,
+        "total_kobo": 3450000
+      },
+      "delivery_days": 4,
+      "delivery_address": "7 Admiralty Way, Lekki Phase 1, Lagos",
+      "tracking": {
+        "status": "Delivered",
+        "number": "PP-TRK-100001",
+        "source": "manual",
+        "label": "Manually updated by seller"
+      },
+      "payment": {
+        "reference": "pp_ord_0002",
+        "provider": "paystack",
+        "verification_mode": "live",
+        "paid_at": "2026-09-05T21:20:28.728Z"
+      },
+      "payout": {
+        "status": "paid"
+      },
+      "fraud_flag": {
+        "triggered": true,
+        "state": "triggered",
+        "label": "Rule-based"
+      },
+      "events": [
+        {
+          "from": "Pending Payment",
+          "to": "Paid",
+          "actor": "system",
+          "at": "2026-09-06T20:20:28.728Z",
+          "note": null
+        },
+        {
+          "from": "Paid",
+          "to": "Awaiting Shipment",
+          "actor": "system",
+          "at": "2026-09-07T20:20:28.728Z",
+          "note": null
+        },
+        {
+          "from": "Awaiting Shipment",
+          "to": "Shipped",
+          "actor": "seller",
+          "at": "2026-09-08T20:20:28.728Z",
+          "note": null
+        },
+        {
+          "from": "Shipped",
+          "to": "Delivered",
+          "actor": "seller",
+          "at": "2026-09-09T20:20:28.728Z",
+          "note": null
+        },
+        {
+          "from": "Delivered",
+          "to": "Completed",
+          "actor": "buyer",
+          "at": "2026-09-10T20:20:28.728Z",
+          "note": null
+        }
+      ],
+      "created_at": "2026-09-05T20:20:28.728Z",
+      "updated_at": "2026-09-10T20:20:28.728Z"
+    },
+    {
+      "id": "7abfd7df-4329-47a0-86d9-4f307216ef70",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "buyer_email": "amina@example.com",
+      "status": "Completed",
+      "product": {
+        "id": "e469b7d9-c8a1-4ea2-a535-ab26f86ff228",
+        "name": "Canvas Slip-Ons",
+        "image_url": ""
+      },
+      "amounts": {
+        "product_kobo": 2800000,
+        "dispatch_fee_kobo": 300000,
+        "total_kobo": 3100000
+      },
+      "delivery_days": 5,
+      "delivery_address": "3 Allen Ave, Ikeja, Lagos",
+      "tracking": {
+        "status": "Delivered",
+        "number": "PP-TRK-100002",
+        "source": "manual",
+        "label": "Manually updated by seller"
+      },
+      "payment": {
+        "reference": "pp_ord_0003",
+        "provider": "paystack",
+        "verification_mode": "live",
+        "paid_at": "2026-09-12T21:20:28.729Z"
+      },
+      "payout": {
+        "status": "paid"
+      },
+      "fraud_flag": {
+        "triggered": false,
+        "state": "cleared",
+        "label": "Rule-based"
+      },
+      "events": [
+        {
+          "from": "Pending Payment",
+          "to": "Paid",
+          "actor": "system",
+          "at": "2026-09-13T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Paid",
+          "to": "Awaiting Shipment",
+          "actor": "system",
+          "at": "2026-09-14T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Awaiting Shipment",
+          "to": "Shipped",
+          "actor": "seller",
+          "at": "2026-09-15T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Shipped",
+          "to": "Delivered",
+          "actor": "seller",
+          "at": "2026-09-16T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Delivered",
+          "to": "Completed",
+          "actor": "buyer",
+          "at": "2026-09-17T20:20:28.729Z",
+          "note": null
+        }
+      ],
+      "created_at": "2026-09-12T20:20:28.729Z",
+      "updated_at": "2026-09-17T20:20:28.729Z"
+    },
+    {
+      "id": "8dca0c38-3b98-41be-bc7b-89504dd0a917",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "buyer_email": "emeka@example.com",
+      "status": "Completed",
+      "product": {
+        "id": "ac857830-8af7-4a78-aefb-4db0611dc622",
+        "name": "Retro High Tops",
+        "image_url": ""
+      },
+      "amounts": {
+        "product_kobo": 5100000,
+        "dispatch_fee_kobo": 250000,
+        "total_kobo": 5350000
+      },
+      "delivery_days": 3,
+      "delivery_address": "22 Herbert Macaulay Way, Yaba, Lagos",
+      "tracking": {
+        "status": "Delivered",
+        "number": "PP-TRK-100003",
+        "source": "manual",
+        "label": "Manually updated by seller"
+      },
+      "payment": {
+        "reference": "pp_ord_0004",
+        "provider": "paystack",
+        "verification_mode": "live",
+        "paid_at": "2026-09-18T21:20:28.729Z"
+      },
+      "payout": {
+        "status": "pending"
+      },
+      "fraud_flag": {
+        "triggered": false,
+        "state": "cleared",
+        "label": "Rule-based"
+      },
+      "events": [
+        {
+          "from": "Pending Payment",
+          "to": "Paid",
+          "actor": "system",
+          "at": "2026-09-19T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Paid",
+          "to": "Awaiting Shipment",
+          "actor": "system",
+          "at": "2026-09-20T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Awaiting Shipment",
+          "to": "Shipped",
+          "actor": "seller",
+          "at": "2026-09-21T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Shipped",
+          "to": "Delivered",
+          "actor": "seller",
+          "at": "2026-09-22T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Delivered",
+          "to": "Completed",
+          "actor": "buyer",
+          "at": "2026-09-23T20:20:28.729Z",
+          "note": null
+        }
+      ],
+      "created_at": "2026-09-18T20:20:28.729Z",
+      "updated_at": "2026-09-23T20:20:28.729Z"
+    },
+    {
+      "id": "842deaf8-cdc6-43db-bb54-65e9b3664674",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "buyer_email": "zainab@example.com",
+      "status": "Disputed",
+      "product": {
+        "id": "599e27cd-e87a-4cfc-82cf-00d42c0e495b",
+        "name": "Trail Hiker Boots",
+        "image_url": ""
+      },
+      "amounts": {
+        "product_kobo": 6750000,
+        "dispatch_fee_kobo": 350000,
+        "total_kobo": 7100000
+      },
+      "delivery_days": 4,
+      "delivery_address": "9 Adebayo Doherty Rd, Lekki, Lagos",
+      "tracking": {
+        "status": "Delivered",
+        "number": "PP-TRK-100004",
+        "source": "manual",
+        "label": "Manually updated by seller"
+      },
+      "payment": {
+        "reference": "pp_ord_0005",
+        "provider": "paystack",
+        "verification_mode": "live",
+        "paid_at": "2026-09-15T21:20:28.729Z"
+      },
+      "payout": {
+        "status": "frozen"
+      },
+      "fraud_flag": {
+        "triggered": false,
+        "state": "cleared",
+        "label": "Rule-based"
+      },
+      "events": [
+        {
+          "from": "Pending Payment",
+          "to": "Paid",
+          "actor": "system",
+          "at": "2026-09-16T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Paid",
+          "to": "Awaiting Shipment",
+          "actor": "system",
+          "at": "2026-09-17T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Awaiting Shipment",
+          "to": "Shipped",
+          "actor": "seller",
+          "at": "2026-09-18T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Shipped",
+          "to": "Disputed",
+          "actor": "buyer",
+          "at": "2026-09-19T20:20:28.729Z",
+          "note": "Item not as described"
+        }
+      ],
+      "created_at": "2026-09-15T20:20:28.729Z",
+      "updated_at": "2026-09-19T20:20:28.729Z"
+    },
+    {
+      "id": "f83f5918-9bf3-4f16-91f3-514a31762770",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "buyer_email": "tunde@example.com",
+      "status": "Cancelled",
+      "product": {
+        "id": "15f95389-f85a-4627-ba36-644b6a780ba5",
+        "name": "Suede Chukka Boots",
+        "image_url": ""
+      },
+      "amounts": {
+        "product_kobo": 5400000,
+        "dispatch_fee_kobo": 250000,
+        "total_kobo": 5650000
+      },
+      "delivery_days": 5,
+      "delivery_address": "1 Awolowo Rd, Ikoyi, Lagos",
+      "tracking": {
+        "status": null,
+        "number": null,
+        "source": "manual",
+        "label": "Manually updated by seller"
+      },
+      "payment": {
+        "reference": "pp_ord_0006",
+        "provider": "paystack",
+        "verification_mode": "live",
+        "paid_at": null
+      },
+      "payout": {
+        "status": "none"
+      },
+      "fraud_flag": {
+        "triggered": false,
+        "state": "cleared",
+        "label": "Rule-based"
+      },
+      "events": [
+        {
+          "from": "Pending Payment",
+          "to": "Cancelled",
+          "actor": "buyer",
+          "at": "2026-09-23T20:20:28.729Z",
+          "note": null
+        }
+      ],
+      "created_at": "2026-09-22T20:20:28.729Z",
+      "updated_at": "2026-09-23T20:20:28.729Z"
+    },
+    {
+      "id": "7bfb1ba9-be08-4592-b9be-d11e96f727d5",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "buyer_email": "ngozi@example.com",
+      "status": "Awaiting Shipment",
+      "product": {
+        "id": "4e0fd012-396f-43ba-b266-60265875a8a5",
+        "name": "Air Runner Sneakers",
+        "image_url": ""
+      },
+      "amounts": {
+        "product_kobo": 4500000,
+        "dispatch_fee_kobo": 250000,
+        "total_kobo": 4750000
+      },
+      "delivery_days": 3,
+      "delivery_address": "45 Ogui Rd, Enugu",
+      "tracking": {
+        "status": null,
+        "number": null,
+        "source": "manual",
+        "label": "Manually updated by seller"
+      },
+      "payment": {
+        "reference": "pp_ord_0007",
+        "provider": "paystack",
+        "verification_mode": "live",
+        "paid_at": "2026-09-25T21:20:28.729Z"
+      },
+      "payout": {
+        "status": "none"
+      },
+      "fraud_flag": {
+        "triggered": false,
+        "state": "cleared",
+        "label": "Rule-based"
+      },
+      "events": [
+        {
+          "from": "Pending Payment",
+          "to": "Paid",
+          "actor": "system",
+          "at": "2026-09-26T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Paid",
+          "to": "Awaiting Shipment",
+          "actor": "system",
+          "at": "2026-09-27T20:20:28.729Z",
+          "note": null
+        }
+      ],
+      "created_at": "2026-09-25T20:20:28.729Z",
+      "updated_at": "2026-09-27T20:20:28.729Z"
+    },
+    {
+      "id": "fb33179e-1dc4-46ba-8b56-2d93492bdd78",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "buyer_email": "kola@example.com",
+      "status": "Shipped",
+      "product": {
+        "id": "a85983df-4378-42c5-a105-7177cfbe95b9",
+        "name": "Court Classic Loafers",
+        "image_url": ""
+      },
+      "amounts": {
+        "product_kobo": 3200000,
+        "dispatch_fee_kobo": 250000,
+        "total_kobo": 3450000
+      },
+      "delivery_days": 4,
+      "delivery_address": "6 Zik Ave, Awka, Anambra",
+      "tracking": {
+        "status": "Picked Up",
+        "number": "PP-TRK-100007",
+        "source": "manual",
+        "label": "Manually updated by seller"
+      },
+      "payment": {
+        "reference": "pp_ord_0008",
+        "provider": "paystack",
+        "verification_mode": "live",
+        "paid_at": "2026-09-23T21:20:28.729Z"
+      },
+      "payout": {
+        "status": "none"
+      },
+      "fraud_flag": {
+        "triggered": false,
+        "state": "cleared",
+        "label": "Rule-based"
+      },
+      "events": [
+        {
+          "from": "Pending Payment",
+          "to": "Paid",
+          "actor": "system",
+          "at": "2026-09-24T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Paid",
+          "to": "Awaiting Shipment",
+          "actor": "system",
+          "at": "2026-09-25T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Awaiting Shipment",
+          "to": "Shipped",
+          "actor": "seller",
+          "at": "2026-09-26T20:20:28.729Z",
+          "note": null
+        }
+      ],
+      "created_at": "2026-09-23T20:20:28.729Z",
+      "updated_at": "2026-09-26T20:20:28.729Z"
+    },
+    {
+      "id": "073519e0-534e-4c0c-ae9d-a88e54ca71cd",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "buyer_email": "hauwa@example.com",
+      "status": "Delivered",
+      "product": {
+        "id": "7703d4d9-326b-43d4-9a9b-ad8a69f95e34",
+        "name": "Canvas Slip-Ons",
+        "image_url": ""
+      },
+      "amounts": {
+        "product_kobo": 2800000,
+        "dispatch_fee_kobo": 300000,
+        "total_kobo": 3100000
+      },
+      "delivery_days": 5,
+      "delivery_address": "11 Ahmadu Bello Way, Kaduna",
+      "tracking": {
+        "status": "Delivered",
+        "number": "PP-TRK-100008",
+        "source": "manual",
+        "label": "Manually updated by seller"
+      },
+      "payment": {
+        "reference": "pp_ord_0009",
+        "provider": "paystack",
+        "verification_mode": "live",
+        "paid_at": "2026-09-20T21:20:28.729Z"
+      },
+      "payout": {
+        "status": "none"
+      },
+      "fraud_flag": {
+        "triggered": false,
+        "state": "cleared",
+        "label": "Rule-based"
+      },
+      "events": [
+        {
+          "from": "Pending Payment",
+          "to": "Paid",
+          "actor": "system",
+          "at": "2026-09-21T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Paid",
+          "to": "Awaiting Shipment",
+          "actor": "system",
+          "at": "2026-09-22T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Awaiting Shipment",
+          "to": "Shipped",
+          "actor": "seller",
+          "at": "2026-09-23T20:20:28.729Z",
+          "note": null
+        },
+        {
+          "from": "Shipped",
+          "to": "Delivered",
+          "actor": "seller",
+          "at": "2026-09-24T20:20:28.729Z",
+          "note": null
+        }
+      ],
+      "created_at": "2026-09-20T20:20:28.729Z",
+      "updated_at": "2026-09-24T20:20:28.729Z"
+    }
+  ],
+  "products": [
+    {
+      "id": "03a89ec5-6e12-43a4-b590-2c225c61208d",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "created_at": "2026-09-27T20:20:28.731Z",
+      "name": "Air Runner Sneakers",
+      "dispatch_fee_kobo": 250000,
+      "price_kobo": 4500000,
+      "stock_quantity": 12,
+      "description": "Lightweight running sneakers with a cushioned sole.",
+      "image_url": ""
+    },
+    {
+      "id": "4607ba39-3986-407e-8c42-ba9c755feb13",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "created_at": "2026-09-27T20:20:28.731Z",
+      "name": "Court Classic Loafers",
+      "dispatch_fee_kobo": 300000,
+      "price_kobo": 3200000,
+      "stock_quantity": 8,
+      "description": "Classic leather loafers for court and street.",
+      "image_url": ""
+    },
+    {
+      "id": "8fdb4bc1-e15a-4c2f-a703-a69cb0a57f9d",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "created_at": "2026-09-27T20:20:28.731Z",
+      "name": "Canvas Slip-Ons",
+      "dispatch_fee_kobo": 250000,
+      "price_kobo": 2800000,
+      "stock_quantity": 20,
+      "description": "Everyday canvas slip-ons, easy on and off.",
+      "image_url": ""
+    },
+    {
+      "id": "3bde7a63-1f59-445e-9653-93c4a7f4284a",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "created_at": "2026-09-27T20:20:28.731Z",
+      "name": "Retro High Tops",
+      "dispatch_fee_kobo": 300000,
+      "price_kobo": 5100000,
+      "stock_quantity": 5,
+      "description": "Retro high-top sneakers with a padded collar.",
+      "image_url": ""
+    },
+    {
+      "id": "06d1131a-722c-4473-a2ff-3a3800a2c740",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "created_at": "2026-09-27T20:20:28.731Z",
+      "name": "Trail Hiker Boots",
+      "dispatch_fee_kobo": 350000,
+      "price_kobo": 6750000,
+      "stock_quantity": 0,
+      "description": "Waterproof trail boots for rough terrain.",
+      "image_url": ""
+    },
+    {
+      "id": "3eec26ef-8697-4ad5-b6b7-9d7135fb06fc",
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "created_at": "2026-09-27T20:20:28.731Z",
+      "name": "Suede Chukka Boots",
+      "dispatch_fee_kobo": 300000,
+      "price_kobo": 5400000,
+      "stock_quantity": 6,
+      "description": "Soft suede chukka boots, smart casual fit.",
+      "image_url": ""
+    }
+  ],
+  "invoices": [
+    {
+      "id": "INV-89D517",
+      "product_kobo": 5400000,
+      "total_kobo": 5700000,
+      "customer": {
+        "name": "Samina Mina",
+        "contact": ""
+      },
+      "note": "",
+      "status": "cancelled",
+      "created_at": "2026-09-24T20:20:28.712Z",
+      "items": [
+        {
+          "product_id": "3eec26ef-8697-4ad5-b6b7-9d7135fb06fc",
+          "name": "Suede Chukka Boots",
+          "image_url": "",
+          "quantity": 1,
+          "unit_price_kobo": 5400000
+        }
+      ],
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "dispatch_fee_kobo": 300000,
+      "order_id": null,
+      "paid_at": null
+    },
+    {
+      "id": "INV-C5B0E1",
+      "product_kobo": 280000,
+      "total_kobo": 530000,
+      "customer": {
+        "name": "Raheem Orekoya",
+        "contact": ""
+      },
+      "note": "",
+      "status": "pending",
+      "created_at": "2026-09-26T20:20:28.712Z",
+      "items": [
+        {
+          "product_id": "8fdb4bc1-e15a-4c2f-a703-a69cb0a57f9d",
+          "name": "Canvas Slip-Ons",
+          "image_url": "",
+          "quantity": 2,
+          "unit_price_kobo": 140000
+        }
+      ],
+      "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",
+      "dispatch_fee_kobo": 250000,
+      "order_id": null,
+      "paid_at": null
+    }
+  ]
+}

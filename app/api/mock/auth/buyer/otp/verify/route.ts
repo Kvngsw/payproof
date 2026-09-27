@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { db, generateId } from "@/lib/mock/store";
 import { issueToken } from "@/lib/mock/auth";
-import { ensureDemoData } from "@/lib/mock/seed";
+import { isReadOnly } from "@/lib/mock/read-only";
+import { READ_ONLY_OTP_CODE } from "@/lib/mock/otp";
 
 export const dynamic = "force-dynamic";
 
@@ -17,43 +18,63 @@ export async function POST(request: Request) {
       );
     }
 
-    const otpRecord = db.otps.findLatestByEmail(email);
+    if (isReadOnly()) {
+      // Nothing can be stored read-only: accept the static dev code instead.
+      if (code !== READ_ONLY_OTP_CODE) {
+        return NextResponse.json(
+          { error: { code: "VALIDATION", message: "Invalid OTP code" } },
+          { status: 400 }
+        );
+      }
+    } else {
+      const otpRecord = db.otps.findLatestByEmail(email);
 
-    if (!otpRecord) {
-      return NextResponse.json(
-        { error: { code: "VALIDATION", message: "No active OTP request found for this email" } },
-        { status: 400 }
-      );
+      if (!otpRecord) {
+        return NextResponse.json(
+          { error: { code: "VALIDATION", message: "No active OTP request found for this email" } },
+          { status: 400 }
+        );
+      }
+
+      if (otpRecord.attempts >= 5) {
+        return NextResponse.json(
+          { error: { code: "RATE_LIMITED", message: "Too many failed attempts. Request a new code." } },
+          { status: 429 }
+        );
+      }
+
+      if (otpRecord.expires_at < Date.now()) {
+        return NextResponse.json(
+          { error: { code: "VALIDATION", message: "OTP code expired" } },
+          { status: 400 }
+        );
+      }
+
+      if (otpRecord.code !== code) {
+        db.otps.updateAttempts(otpRecord.id, otpRecord.attempts + 1);
+        return NextResponse.json(
+          { error: { code: "VALIDATION", message: "Invalid OTP code" } },
+          { status: 400 }
+        );
+      }
+
+      db.otps.markUsed(otpRecord.id, new Date().toISOString());
     }
-
-    if (otpRecord.attempts >= 5) {
-      return NextResponse.json(
-        { error: { code: "RATE_LIMITED", message: "Too many failed attempts. Request a new code." } },
-        { status: 429 }
-      );
-    }
-
-    if (otpRecord.expires_at < Date.now()) {
-      return NextResponse.json(
-        { error: { code: "VALIDATION", message: "OTP code expired" } },
-        { status: 400 }
-      );
-    }
-
-    if (otpRecord.code !== code) {
-      db.otps.updateAttempts(otpRecord.id, otpRecord.attempts + 1);
-      return NextResponse.json(
-        { error: { code: "VALIDATION", message: "Invalid OTP code" } },
-        { status: 400 }
-      );
-    }
-
-    db.otps.markUsed(otpRecord.id, new Date().toISOString());
-
-    ensureDemoData(); // buyer sessions can be the first on a fresh store
 
     let buyer = db.buyers.findByEmail(email);
     if (!buyer) {
+      if (isReadOnly()) {
+        return NextResponse.json(
+          {
+            error: {
+              code: "READ_ONLY",
+              message:
+                "Demo deployment is read-only — no account for this email. Sign in as hauwa@example.com (code 123456).",
+            },
+          },
+          { status: 403 },
+        );
+      }
       const buyerId = generateId();
       const created_at = new Date().toISOString();
       buyer = { id: buyerId, email, created_at };

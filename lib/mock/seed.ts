@@ -1,3 +1,6 @@
+// Demo dataset generator — NOT used at runtime. The app boots from the
+// committed lib/mock/data.json instead; this module only runs when
+// regenerating it via scripts/generate-mock-data.ts.
 import { db, generateId, hashPassword } from "./store";
 
 export const DEMO_SEEDED_EMAIL = "ada@kicks.com";

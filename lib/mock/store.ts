@@ -1,10 +1,6 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import crypto from "node:crypto";
-import { DatabaseSync } from "node:sqlite";
-
-const DATA_DIR = path.join(process.cwd(), "mock-data");
+import data from "./data.json";
+import { isReadOnly } from "./read-only";
 
 export type CollectionName =
   | "sellers"
@@ -15,65 +11,48 @@ export type CollectionName =
   | "invoices";
 
 // ---------------------------------------------------------------------------
-// Storage: SQLite (node:sqlite, built-in). Rows live as JSON documents so the
-// repository below keeps its exact in-memory filtering semantics. Demo data is
-// seeded in code by lib/mock/seed.ts — there is no JSON file import. Falls
-// back to /tmp when the project directory is read-only (deployed/serverless).
+// Storage: static JSON (lib/mock/data.json) cloned into process memory.
+// Every server instance boots from the identical dataset, so tokens minted on
+// one instance resolve on all of them — no shared filesystem required.
+// Local writes mutate only this process's copy (reset on server restart).
+// On Vercel all mutations are blocked at the route level (lib/mock/read-only)
+// and writeCollection throws as a safety net.
+//
+// Regenerate the dataset (assigns fresh IDs — invalidates deployed tokens):
+//   MOCK_SEED_EMPTY=1 npx tsx scripts/generate-mock-data.ts
 // ---------------------------------------------------------------------------
 
-let sql: DatabaseSync | null = null;
+type Collections = Record<CollectionName, any[]>;
 
-function resolveDbPath(): string {
-  try {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    const probe = path.join(DATA_DIR, ".write-probe");
-    fs.writeFileSync(probe, "1");
-    fs.unlinkSync(probe);
-    return path.join(DATA_DIR, "mock.db");
-  } catch {
-    return path.join(os.tmpdir(), "payproof-mock.db");
-  }
-}
+const empty: Collections = {
+  sellers: [],
+  buyers: [],
+  otp_codes: [],
+  orders: [],
+  products: [],
+  invoices: [],
+};
 
-function getSql(): DatabaseSync {
-  if (sql) return sql;
-  const db = new DatabaseSync(resolveDbPath());
-  db.exec("PRAGMA busy_timeout = 5000");
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS mock_rows (
-      collection TEXT NOT NULL,
-      seq INTEGER PRIMARY KEY AUTOINCREMENT,
-      data TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_mock_rows_collection ON mock_rows(collection);
-  `);
-  sql = db;
-  return db;
-}
+const state: Collections = process.env.MOCK_SEED_EMPTY
+  ? empty
+  : structuredClone({
+      sellers: data.sellers,
+      buyers: data.buyers,
+      otp_codes: data.otp_codes,
+      orders: data.orders,
+      products: data.products,
+      invoices: data.invoices,
+    });
 
 export function readCollection(name: CollectionName): any[] {
-  try {
-    const rows = getSql()
-      .prepare("SELECT data FROM mock_rows WHERE collection = ? ORDER BY seq")
-      .all(name);
-    return rows.map((row) => JSON.parse(String(row.data)));
-  } catch {
-    return [];
-  }
+  return state[name];
 }
 
 export function writeCollection(name: CollectionName, rows: any[]) {
-  const db = getSql();
-  db.exec("BEGIN");
-  try {
-    db.prepare("DELETE FROM mock_rows WHERE collection = ?").run(name);
-    const ins = db.prepare("INSERT INTO mock_rows (collection, data) VALUES (?, ?)");
-    for (const row of rows) ins.run(name, JSON.stringify(row));
-    db.exec("COMMIT");
-  } catch (err) {
-    db.exec("ROLLBACK");
-    throw err;
+  if (isReadOnly()) {
+    throw new Error("Mock store is read-only on this deployment");
   }
+  state[name] = rows;
 }
 
 export function generateId() {
@@ -100,12 +79,12 @@ export const db = {
     findById: (id: string) => {
       return readCollection("sellers").find((s) => s.id === id);
     },
-    insert: (seller: any) => {
+    insert: (seller: object) => {
       const rows = readCollection("sellers");
       rows.push(seller);
       writeCollection("sellers", rows);
     },
-    update: (id: string, patch: any) => {
+    update: (id: string, patch: object) => {
       const rows = readCollection("sellers");
       const row = rows.find((s) => s.id === id);
       if (!row) return null;
@@ -121,12 +100,12 @@ export const db = {
     findById: (id: string) => {
       return readCollection("buyers").find((b) => b.id === id);
     },
-    insert: (buyer: any) => {
+    insert: (buyer: object) => {
       const rows = readCollection("buyers");
       rows.push(buyer);
       writeCollection("buyers", rows);
     },
-    update: (id: string, patch: any) => {
+    update: (id: string, patch: object) => {
       const rows = readCollection("buyers");
       const row = rows.find((b) => b.id === id);
       if (!row) return null;
@@ -139,7 +118,7 @@ export const db = {
     findBySeller: (sellerId: string) => {
       return readCollection("orders").filter((o) => o.seller_id === sellerId);
     },
-    insertMany: (orders: any[]) => {
+    insertMany: (orders: object[]) => {
       const rows = readCollection("orders");
       rows.push(...orders);
       writeCollection("orders", rows);
@@ -160,12 +139,12 @@ export const db = {
     findById: (id: string) => {
       return readCollection("products").find((p) => p.id === id);
     },
-    insert: (product: any) => {
+    insert: (product: object) => {
       const rows = readCollection("products");
       rows.push(product);
       writeCollection("products", rows);
     },
-    insertMany: (products: any[]) => {
+    insertMany: (products: object[]) => {
       const rows = readCollection("products");
       rows.push(...products);
       writeCollection("products", rows);
@@ -201,12 +180,12 @@ export const db = {
         (i) => String(i.code ?? i.id).toUpperCase() === target,
       );
     },
-    insert: (invoice: any) => {
+    insert: (invoice: object) => {
       const rows = readCollection("invoices");
       rows.push(invoice);
       writeCollection("invoices", rows);
     },
-    insertMany: (invoices: any[]) => {
+    insertMany: (invoices: object[]) => {
       const rows = readCollection("invoices");
       rows.push(...invoices);
       writeCollection("invoices", rows);
@@ -228,7 +207,7 @@ export const db = {
       if (records.length === 0) return null;
       return records.sort((a, b) => b.expires_at - a.expires_at)[0];
     },
-    insert: (otp: any) => {
+    insert: (otp: object) => {
       const rows = readCollection("otp_codes");
       rows.push(otp);
       writeCollection("otp_codes", rows);

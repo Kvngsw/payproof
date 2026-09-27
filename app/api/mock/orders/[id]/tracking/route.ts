@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/mock/auth";
 import { db } from "@/lib/mock/store";
 import { TRACKING_STATUSES } from "@/lib/mock/seed";
+import {
+  isReadOnly,
+  readOnlyResponse,
+  READ_ONLY_ACTION_MESSAGE,
+} from "@/lib/mock/read-only";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +14,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (isReadOnly()) return readOnlyResponse(READ_ONLY_ACTION_MESSAGE);
   const authHeader = request.headers.get("authorization");
   const user = verifyToken(authHeader);
 

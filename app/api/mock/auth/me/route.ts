@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/mock/auth";
 import { db } from "@/lib/mock/store";
+import {
+  isReadOnly,
+  readOnlyResponse,
+  READ_ONLY_PROFILE_MESSAGE,
+} from "@/lib/mock/read-only";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +55,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  if (isReadOnly()) return readOnlyResponse(READ_ONLY_PROFILE_MESSAGE);
   const user = verifyToken(request.headers.get("authorization"));
   if (!user || user.role !== "seller") {
     return NextResponse.json(

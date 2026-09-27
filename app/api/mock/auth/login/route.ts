@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { db, verifyPassword } from "@/lib/mock/store";
-import { ensureDemoData } from "@/lib/mock/seed";
 import { issueOtp } from "@/lib/mock/otp";
 
 export const dynamic = "force-dynamic";
@@ -17,8 +16,6 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-
-    ensureDemoData();
 
     const seller = db.sellers.findByEmail(email);
     const buyer = db.buyers.findByEmail(email);

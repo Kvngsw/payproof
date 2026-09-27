@@ -6,6 +6,11 @@ import {
   persist,
   notFound,
 } from "@/lib/mock/order-actions";
+import {
+  isReadOnly,
+  readOnlyResponse,
+  READ_ONLY_ACTION_MESSAGE,
+} from "@/lib/mock/read-only";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +18,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  if (isReadOnly()) return readOnlyResponse(READ_ONLY_ACTION_MESSAGE);
   const auth = requireRole(request, "buyer");
   if ("error" in auth) return auth.error;
 
