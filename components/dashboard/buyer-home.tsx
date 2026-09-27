@@ -409,150 +409,154 @@ export function BuyerHome() {
     } else {
       body = (
         <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-          <section className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
-            <button
-              type="button"
-              onClick={clearInvoice}
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <IconArrowLeft className="size-4" />
-              Different code
-            </button>
-            <header className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-dashed border-border/60 pb-4">
-              <h2 className="font-heading text-xl font-extrabold tracking-tight">
-                Invoice <span className="font-mono">#{invoice.id}</span>
+          <div className="rounded-2xl bg-secondary p-1">
+            <section className="h-full rounded-xl border border-border/60 bg-card p-6">
+              <button
+                type="button"
+                onClick={clearInvoice}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <IconArrowLeft className="size-4" />
+                Different code
+              </button>
+              <header className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-dashed border-border/60 pb-4">
+                <h2 className="font-heading text-xl font-extrabold tracking-tight">
+                  Invoice <span className="font-mono">#{invoice.id}</span>
+                </h2>
+                <InvoiceStatusChip status={invoice.status} />
+                <span className="text-xs text-muted-foreground">
+                  Created {formatDateTime(invoice.created_at)}
+                </span>
+              </header>
+
+              <ul className="mt-2">
+                {invoice.items.map((item) => (
+                  <li
+                    key={item.product_id}
+                    className="flex items-center justify-between gap-4 border-b border-dashed border-border/60 py-2.5"
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <ProductThumb
+                        url={item.image_url}
+                        name={item.name}
+                        className="size-8 shrink-0 rounded-lg"
+                      />
+                      <span className="truncate text-sm font-medium">
+                        {item.name}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        × {item.quantity}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-sm font-medium tabular-nums">
+                      <Amount
+                        value={(item.quantity * item.unit_price_kobo) / 100}
+                      />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              {invoice.note && (
+                <p className="mt-4 text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">Note:</span>{" "}
+                  {invoice.note}
+                </p>
+              )}
+            </section>
+          </div>
+
+          <div className="rounded-2xl bg-secondary p-1">
+            <section className="h-full rounded-xl border border-border/60 bg-card p-6">
+              <h2 className="text-sm font-medium text-muted-foreground">
+                Delivery details
               </h2>
-              <InvoiceStatusChip status={invoice.status} />
-              <span className="text-xs text-muted-foreground">
-                Created {formatDateTime(invoice.created_at)}
-              </span>
-            </header>
 
-            <ul className="mt-2">
-              {invoice.items.map((item) => (
-                <li
-                  key={item.product_id}
-                  className="flex items-center justify-between gap-4 border-b border-dashed border-border/60 py-2.5"
-                >
-                  <span className="flex min-w-0 items-center gap-2.5">
-                    <ProductThumb
-                      url={item.image_url}
-                      name={item.name}
-                      className="size-8 shrink-0 rounded-lg"
-                    />
-                    <span className="truncate text-sm font-medium">
-                      {item.name}
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      × {item.quantity}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-sm font-medium tabular-nums">
+              <dl className="mt-4 space-y-3 border-b border-dashed border-border/60 pb-4 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-muted-foreground">Subtotal</dt>
+                  <dd className="tabular-nums">
+                    <Amount value={invoice.product_kobo / 100} />
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-muted-foreground">Dispatch fee</dt>
+                  <dd className="tabular-nums">
                     <Amount
-                      value={(item.quantity * item.unit_price_kobo) / 100}
+                      value={
+                        (invoice.dispatch_fee_kobo ??
+                          invoice.total_kobo - invoice.product_kobo) / 100
+                      }
                     />
-                  </span>
-                </li>
-              ))}
-            </ul>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-4 text-base font-semibold">
+                  <dt>Total amount due</dt>
+                  <dd className="tabular-nums">
+                    <Amount value={invoice.total_kobo / 100} />
+                  </dd>
+                </div>
+              </dl>
 
-            {invoice.note && (
-              <p className="mt-4 text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Note:</span>{" "}
-                {invoice.note}
-              </p>
-            )}
-          </section>
-
-          <section className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
-            <h2 className="text-sm font-medium text-muted-foreground">
-              Delivery details
-            </h2>
-
-            <dl className="mt-4 space-y-3 border-b border-dashed border-border/60 pb-4 text-sm">
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">Subtotal</dt>
-                <dd className="tabular-nums">
-                  <Amount value={invoice.product_kobo / 100} />
-                </dd>
-              </div>
-              <div className="flex items-center justify-between gap-4">
-                <dt className="text-muted-foreground">Dispatch fee</dt>
-                <dd className="tabular-nums">
-                  <Amount
-                    value={
-                      (invoice.dispatch_fee_kobo ??
-                        invoice.total_kobo - invoice.product_kobo) / 100
-                    }
+              <form
+                className="mt-5 space-y-4"
+                onSubmit={handlePay}
+                noValidate
+              >
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="delivery-address"
+                    className="text-xs uppercase tracking-wide text-muted-foreground"
+                  >
+                    Delivery address
+                  </Label>
+                  <textarea
+                    id="delivery-address"
+                    value={address}
+                    onChange={(event) => {
+                      setAddress(event.target.value);
+                      if (payErrors.address)
+                        setPayErrors((prev) => ({ ...prev, address: undefined }));
+                    }}
+                    placeholder="Street, area, city, state"
+                    required
+                    minLength={10}
+                    aria-invalid={payErrors.address ? true : undefined}
+                    className="min-h-20 w-full rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-base outline-none transition-[color,box-shadow,border-color] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"
                   />
-                </dd>
-              </div>
-              <div className="flex items-center justify-between gap-4 text-base font-semibold">
-                <dt>Total amount due</dt>
-                <dd className="tabular-nums">
-                  <Amount value={invoice.total_kobo / 100} />
-                </dd>
-              </div>
-            </dl>
-
-            <form
-              className="mt-5 space-y-4"
-              onSubmit={handlePay}
-              noValidate
-            >
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="delivery-address"
-                  className="text-xs uppercase tracking-wide text-muted-foreground"
-                >
-                  Delivery address
-                </Label>
-                <textarea
-                  id="delivery-address"
-                  value={address}
-                  onChange={(event) => {
-                    setAddress(event.target.value);
-                    if (payErrors.address)
-                      setPayErrors((prev) => ({ ...prev, address: undefined }));
-                  }}
-                  placeholder="Street, area, city, state"
-                  required
-                  minLength={10}
-                  aria-invalid={payErrors.address ? true : undefined}
-                  className="min-h-20 w-full rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-base outline-none transition-[color,box-shadow,border-color] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"
-                />
-                <FieldError>{payErrors.address}</FieldError>
-              </div>
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="phone"
-                  className="text-xs uppercase tracking-wide text-muted-foreground"
-                >
-                  Phone number
-                </Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(event) => {
-                    setPhone(event.target.value);
-                    if (payErrors.phone)
-                      setPayErrors((prev) => ({ ...prev, phone: undefined }));
-                  }}
-                  placeholder="0801 234 5678"
-                  required
-                  aria-invalid={payErrors.phone ? true : undefined}
-                />
-                <FieldError>{payErrors.phone}</FieldError>
-              </div>
-              <Button type="submit" className="w-full" disabled={busy}>
-                {busy ? "Confirming payment..." : "Pay & create order"}
-              </Button>
-              <p className="text-center text-xs text-muted-foreground">
-                Demo mode — no real money moves.
-              </p>
-            </form>
-          </section>
+                  <FieldError>{payErrors.address}</FieldError>
+                </div>
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="phone"
+                    className="text-xs uppercase tracking-wide text-muted-foreground"
+                  >
+                    Phone number
+                  </Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(event) => {
+                      setPhone(event.target.value);
+                      if (payErrors.phone)
+                        setPayErrors((prev) => ({ ...prev, phone: undefined }));
+                    }}
+                    placeholder="0801 234 5678"
+                    required
+                    aria-invalid={payErrors.phone ? true : undefined}
+                  />
+                  <FieldError>{payErrors.phone}</FieldError>
+                </div>
+                <Button type="submit" className="w-full" disabled={busy}>
+                  {busy ? "Confirming payment..." : "Pay & create order"}
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  Demo mode — no real money moves.
+                </p>
+              </form>
+            </section>
+          </div>
         </div>
       );
     }
@@ -570,48 +574,52 @@ export function BuyerHome() {
       {header}
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <section className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
-          <div className="flex items-center justify-between border-b border-dashed border-border/60 pb-3">
-            <h2 className="text-sm font-medium text-muted-foreground">
-              Recent orders
-            </h2>
-            <Link
-              href="/dashboard/orders"
-              className="text-xs font-medium text-primary hover:underline"
-            >
-              View all
-            </Link>
-          </div>
-          <div className="pt-2">
-            <RecentOrders orders={orders} />
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
-          <div className="border-b border-dashed border-border/60 pb-3">
-            <h2 className="text-sm font-medium text-muted-foreground">
-              Your details
-            </h2>
-          </div>
-          <dl className="grid gap-4 pt-5">
-            <div>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                Email
-              </dt>
-              <dd className="pt-1 break-all text-sm font-medium">
-                {profile.email}
-              </dd>
+        <div className="rounded-2xl bg-secondary p-1">
+          <section className="h-full rounded-xl border border-border/60 bg-card p-6">
+            <div className="flex items-center justify-between border-b border-dashed border-border/60 pb-3">
+              <h2 className="text-sm font-medium text-muted-foreground">
+                Recent orders
+              </h2>
+              <Link
+                href="/dashboard/orders"
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                View all
+              </Link>
             </div>
-            {memberSince && (
+            <div className="pt-2">
+              <RecentOrders orders={orders} />
+            </div>
+          </section>
+        </div>
+
+        <div className="rounded-2xl bg-secondary p-1">
+          <section className="h-full rounded-xl border border-border/60 bg-card p-6">
+            <div className="border-b border-dashed border-border/60 pb-3">
+              <h2 className="text-sm font-medium text-muted-foreground">
+                Your details
+              </h2>
+            </div>
+            <dl className="grid gap-4 pt-5">
               <div>
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Member since
+                  Email
                 </dt>
-                <dd className="pt-1 text-sm font-medium">{memberSince}</dd>
+                <dd className="pt-1 break-all text-sm font-medium">
+                  {profile.email}
+                </dd>
               </div>
-            )}
-          </dl>
-        </section>
+              {memberSince && (
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Member since
+                  </dt>
+                  <dd className="pt-1 text-sm font-medium">{memberSince}</dd>
+                </div>
+              )}
+            </dl>
+          </section>
+        </div>
       </div>
 
       <CodeEntryCard

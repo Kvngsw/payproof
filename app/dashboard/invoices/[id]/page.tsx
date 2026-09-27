@@ -180,37 +180,39 @@ export default function InvoiceDetailPage() {
       </header>
 
       {invoice.status === "pending" && (
-        <section className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="text-sm font-medium">Share this link</h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Your customer opens it, fills in delivery details, and sends
-                payment. The invoice then becomes an order.
-              </p>
+        <div className="rounded-2xl bg-secondary p-1">
+          <section className="rounded-xl border border-border/60 bg-card p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-medium">Share this link</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Your customer opens it, fills in delivery details, and sends
+                  payment. The invoice then becomes an order.
+                </p>
+              </div>
+              <Button onClick={copyLink}>
+                {copied ? (
+                  <IconCheck className="size-4" />
+                ) : (
+                  <IconCopy className="size-4" />
+                )}
+                Copy link
+              </Button>
             </div>
-            <Button onClick={copyLink}>
-              {copied ? (
-                <IconCheck className="size-4" />
-              ) : (
-                <IconCopy className="size-4" />
-              )}
-              Copy link
-            </Button>
-          </div>
-          <p className="mt-4 truncate rounded-lg border border-dashed border-border/60 bg-muted/40 px-3 py-2 font-mono text-xs text-muted-foreground">
-            {invoiceLink(invoice.id)}
-          </p>
-          <div className="mt-4 flex justify-end border-t border-dashed border-border/60 pt-4">
-            <Button
-              variant="outline"
-              onClick={handleCancel}
-              disabled={busy}
-            >
-              {busy ? "Cancelling..." : "Cancel invoice"}
-            </Button>
-          </div>
-        </section>
+            <p className="mt-4 truncate rounded-lg border border-dashed border-border/60 bg-muted/40 px-3 py-2 font-mono text-xs text-muted-foreground">
+              {invoiceLink(invoice.id)}
+            </p>
+            <div className="mt-4 flex justify-end border-t border-dashed border-border/60 pt-4">
+              <Button
+                variant="outline"
+                onClick={handleCancel}
+                disabled={busy}
+              >
+                {busy ? "Cancelling..." : "Cancel invoice"}
+              </Button>
+            </div>
+          </section>
+        </div>
       )}
 
       {invoice.status === "paid" && (

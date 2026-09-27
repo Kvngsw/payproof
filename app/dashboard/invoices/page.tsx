@@ -231,105 +231,107 @@ export default function InvoicesPage() {
           </Button>
         </div>
       ) : (
-        <div className="rounded-xl border border-border/60 bg-card shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Bill to</TableHead>
-                <TableHead className="hidden sm:table-cell">
-                  Product
-                </TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="hidden lg:table-cell">Created</TableHead>
-                <TableHead className="w-24" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {visible.map((invoice) => (
-                <TableRow
-                  key={invoice.id}
-                  className="cursor-pointer"
-                  onClick={() => router.push(`/dashboard/invoices/${invoice.id}`)}
-                >
-                  <TableCell className="font-mono text-xs font-medium">
-                    #{invoice.id}
-                  </TableCell>
-                  <TableCell>
-                    <p className="font-medium">{invoice.customer.name}</p>
-                    {invoice.customer.contact && (
-                      <p className="hidden max-w-40 truncate text-xs text-muted-foreground sm:block">
-                        {invoice.customer.contact}
-                      </p>
-                    )}
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <div className="flex items-center gap-2.5">
-                      <ProductThumb
-                        url={invoice.items[0]?.image_url ?? ""}
-                        name={invoice.items[0]?.name ?? ""}
-                        className="size-8 shrink-0 rounded-lg"
-                      />
-                      <span className="max-w-40 truncate text-sm text-muted-foreground">
-                        {invoice.items[0]?.name ?? "—"}
-                        {invoice.items.length > 1 &&
-                          ` +${invoice.items.length - 1}`}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    <Amount value={invoice.total_kobo / 100} />
-                  </TableCell>
-                  <TableCell>
-                    <InvoiceStatusChip status={invoice.status} />
-                  </TableCell>
-                  <TableCell className="hidden whitespace-nowrap text-muted-foreground lg:table-cell">
-                    {formatDate(invoice.created_at)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div
-                      className="flex items-center justify-end gap-1"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <CopyLinkButton id={invoice.id} />
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          render={
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={`Actions for invoice ${invoice.id}`}
-                            />
-                          }
-                        >
-                          <IconDots className="size-4" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onSelect={() =>
-                              router.push(`/dashboard/invoices/${invoice.id}`)
+        <div className="rounded-2xl bg-secondary p-1">
+          <div className="rounded-xl border border-border/60 bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead>Bill to</TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                    Product
+                  </TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="hidden lg:table-cell">Created</TableHead>
+                  <TableHead className="w-24" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visible.map((invoice) => (
+                  <TableRow
+                    key={invoice.id}
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/dashboard/invoices/${invoice.id}`)}
+                  >
+                    <TableCell className="font-mono text-xs font-medium">
+                      #{invoice.id}
+                    </TableCell>
+                    <TableCell>
+                      <p className="font-medium">{invoice.customer.name}</p>
+                      {invoice.customer.contact && (
+                        <p className="hidden max-w-40 truncate text-xs text-muted-foreground sm:block">
+                          {invoice.customer.contact}
+                        </p>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      <div className="flex items-center gap-2.5">
+                        <ProductThumb
+                          url={invoice.items[0]?.image_url ?? ""}
+                          name={invoice.items[0]?.name ?? ""}
+                          className="size-8 shrink-0 rounded-lg"
+                        />
+                        <span className="max-w-40 truncate text-sm text-muted-foreground">
+                          {invoice.items[0]?.name ?? "—"}
+                          {invoice.items.length > 1 &&
+                            ` +${invoice.items.length - 1}`}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      <Amount value={invoice.total_kobo / 100} />
+                    </TableCell>
+                    <TableCell>
+                      <InvoiceStatusChip status={invoice.status} />
+                    </TableCell>
+                    <TableCell className="hidden whitespace-nowrap text-muted-foreground lg:table-cell">
+                      {formatDate(invoice.created_at)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div
+                        className="flex items-center justify-end gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <CopyLinkButton id={invoice.id} />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={`Actions for invoice ${invoice.id}`}
+                              />
                             }
                           >
-                            Open
-                          </DropdownMenuItem>
-                          {invoice.status === "pending" && (
+                            <IconDots className="size-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              variant="destructive"
-                              onSelect={() => handleCancel(invoice)}
+                              onSelect={() =>
+                                router.push(`/dashboard/invoices/${invoice.id}`)
+                              }
                             >
-                              <IconX className="size-4" />
-                              Cancel
+                              Open
                             </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                            {invoice.status === "pending" && (
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={() => handleCancel(invoice)}
+                              >
+                                <IconX className="size-4" />
+                                Cancel
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
 

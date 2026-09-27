@@ -256,80 +256,82 @@ export default function InventoryPage() {
           </Button>
         </div>
       ) : (
-        <div className="rounded-xl border border-border/60 bg-card shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead className="text-right">Price</TableHead>
-                <TableHead>Stock</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(products ?? []).map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <ProductThumb
-                        url={product.image_url}
-                        name={product.name}
-                        className="size-10 shrink-0 rounded-lg"
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{product.name}</p>
-                        {product.description && (
-                          <p className="hidden max-w-56 truncate text-xs text-muted-foreground sm:block">
-                            {product.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    <Amount value={product.price_kobo / 100} />
-                  </TableCell>
-                  <TableCell>
-                    <StockChip stock={product.stock_quantity} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={`Actions for ${product.name}`}
-                          />
-                        }
-                      >
-                        <IconDots className="size-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onSelect={() => {
-                            openEdit(product);
-                          }}
-                        >
-                          <IconPencil className="size-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onSelect={() => {
-                            setPendingDelete(product);
-                          }}
-                        >
-                          <IconTrash className="size-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+        <div className="rounded-2xl bg-secondary p-1">
+          <div className="rounded-xl border border-border/60 bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead>Stock</TableHead>
+                  <TableHead className="w-12" />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {(products ?? []).map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <ProductThumb
+                          url={product.image_url}
+                          name={product.name}
+                          className="size-10 shrink-0 rounded-lg"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{product.name}</p>
+                          {product.description && (
+                            <p className="hidden max-w-56 truncate text-xs text-muted-foreground sm:block">
+                              {product.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">
+                      <Amount value={product.price_kobo / 100} />
+                    </TableCell>
+                    <TableCell>
+                      <StockChip stock={product.stock_quantity} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Actions for ${product.name}`}
+                            />
+                          }
+                        >
+                          <IconDots className="size-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              openEdit(product);
+                            }}
+                          >
+                            <IconPencil className="size-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onSelect={() => {
+                              setPendingDelete(product);
+                            }}
+                          >
+                            <IconTrash className="size-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
 
