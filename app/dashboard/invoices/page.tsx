@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   Table,
   TableBody,
@@ -85,6 +86,7 @@ export default function InvoicesPage() {
   const source = useDataSource();
   const [invoices, setInvoices] = useState<MockInvoice[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [view, setView] = useState<"open" | "all">("open");
 
   useEffect(() => {
     if (session.status !== "authed") return;
@@ -114,6 +116,9 @@ export default function InvoicesPage() {
   }
 
   const loading = session.status === "loading" || (invoices === null && !failed);
+  const visible =
+    invoices?.filter((invoice) => view === "all" || invoice.status === "pending") ??
+    [];
 
   if (source === "live") {
     return (
@@ -138,6 +143,33 @@ export default function InvoicesPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Send a payment request. Once it&apos;s paid, it becomes an order.
           </p>
+          <div
+            role="group"
+            aria-label="Filter invoices"
+            className="mt-3 inline-grid grid-cols-2 gap-1 rounded-3xl bg-secondary p-1"
+          >
+            {(
+              [
+                { value: "open", label: "Open" },
+                { value: "all", label: "All" },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={view === option.value}
+                onClick={() => setView(option.value)}
+                className={cn(
+                  "inline-flex h-7 items-center justify-center rounded-full px-3 text-xs font-medium transition-[color,background-color,box-shadow] duration-150 ease-out focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/30",
+                  view === option.value
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
         <Button onClick={() => router.push("/dashboard/invoices/new")}>
           <IconPlus className="size-4" />
@@ -184,6 +216,20 @@ export default function InvoicesPage() {
             New invoice
           </Button>
         </div>
+      ) : visible.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border/60 p-10 text-center">
+          <h2 className="font-heading text-lg font-bold">No open invoices</h2>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+            Every invoice is settled or cancelled. Paid ones become orders.
+          </p>
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={() => setView("all")}
+          >
+            Show all invoices
+          </Button>
+        </div>
       ) : (
         <div className="rounded-xl border border-border/60 bg-card shadow-sm">
           <Table>
@@ -201,7 +247,7 @@ export default function InvoicesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(invoices ?? []).map((invoice) => (
+              {visible.map((invoice) => (
                 <TableRow
                   key={invoice.id}
                   className="cursor-pointer"

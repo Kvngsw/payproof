@@ -416,7 +416,7 @@ export async function payInvoice(
 }
 
 export function invoiceLink(id: string) {
-  const path = `/dashboard/redeem?code=${encodeURIComponent(id)}`;
+  const path = `/dashboard?invoice=${encodeURIComponent(id)}`;
   if (typeof window === "undefined") return path;
   return `${window.location.origin}${path}`;
 }

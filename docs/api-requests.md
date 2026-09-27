@@ -245,7 +245,7 @@ Legend: ✅ exists & wired · ⚠️ exists with gaps (item id) · ❌ missing �
 | Products list | ✓ | ✅ | ⚠️ R7, R8 | |
 | Products create/patch | ✓ | ✅ | ⚠️ V1–V4 | |
 | Products **delete** | ✓ | ✅ | ✅ §1.2 (handler shipped in this repo) | returns `409 PRODUCT_HAS_ORDERS` when referenced |
-| **Invoices** list/create/detail/cancel/public + **pay→order** | ✓ (share link → `/dashboard/redeem?code=`) | ✅ (§1.1, incl. `POST /invoices/:id/pay`) | ❌ §1.1 | **top priority**; live shows `DemoDataNotice` |
+| **Invoices** list/create/detail/cancel/public + **pay→order** | ✓ (share link → `/dashboard?invoice=`, inline pay panel on buyer home) | ✅ (§1.1, incl. `POST /invoices/:id/pay`) | ❌ §1.1 | **top priority**; live shows `DemoDataNotice` |
 | Seller public profile + reputation | — | ✅ (parity pass) | ✅ | storefront page planned |
 | Order assistant | ✓ buyer UI | ✅ (stub, canned reply) | ✅ | chat panel on buyer order detail |
 | Auth refresh | — | ✅ (parity pass) | ✅ | FE uses cookie flow |

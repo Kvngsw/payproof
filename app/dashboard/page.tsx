@@ -387,6 +387,18 @@ export default function DashboardPage() {
     };
   }, [role]);
 
+  // Invoice share links are buyer-facing; a seller opening one gets a hint.
+  useEffect(() => {
+    if (role !== "seller") return;
+    const raw =
+      new URLSearchParams(window.location.search).get("invoice") ?? "";
+    if (raw.trim()) {
+      toast.info(
+        "Invoice links are for buyers — sign in with a buyer account to pay it.",
+      );
+    }
+  }, [role]);
+
   if (session.status === "loading") {
     return (
       <div className="animate-pulse space-y-6" aria-hidden="true">
