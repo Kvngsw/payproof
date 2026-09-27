@@ -43,7 +43,8 @@ model Invoice {
   customerContact String
   note       String        @default("")
   subtotalKobo Int
-  totalKobo  Int           // = subtotalKobo today (platform computes dispatch/delivery at checkout)
+  dispatchFeeKobo Int      // max of the items' products' dispatch fees (D7 — platform sets those)
+  totalKobo  Int           // = subtotalKobo + dispatchFeeKobo
   orderId    String?       // set when the invoice is paid and an order is born
   items      InvoiceItem[]
   createdAt  DateTime      @default(now())
@@ -93,7 +94,8 @@ Response `201` / public GET response `200` (one object):
     { "product_id": "uuid", "name": "Air Max 90", "image_url": "", "quantity": 2, "unit_price_kobo": 2700000 }
   ],
   "product_kobo": 5400000,
-  "total_kobo": 5400000,
+  "dispatch_fee_kobo": 250000,
+  "total_kobo": 5650000,
   "customer": { "name": "Ada Lovelace", "contact": "ada@example.com" },
   "note": "",
   "status": "pending",
@@ -115,9 +117,17 @@ Public GET adds `"seller": { "business_name": "Kicks by Ada" }`.
 
 **Payment flow (critical):** when the buyer completes payment for an invoice, the invoice must
 become `status:"paid"`, `paid_at` set, `order_id` set, stock decremented per item, and an order
-born with `status:"PendingPayment"→"Paid"` snapshots (product/dispatch/total from the invoice at
-creation time). Seller then sees it in the normal orders list. Paying a `cancelled` or already
-`paid` invoice → `409`.
+born already paid: display status `Awaiting Shipment` with event chain
+`Pending Payment → Paid → Awaiting Shipment`, amounts snapshotted from the invoice
+(`product/dispatch/total`). Seller then sees it in the normal orders list. Paying a `cancelled`
+or already `paid` invoice → `409`.
+
+**How the FE drives the demo step** (mock-only — the live path is gated to demo data in the UI):
+`POST /invoices/:id/pay` (buyer auth) with `{"delivery_address": "≥10 chars", "phone": "required"}`
+→ `201 {order_id}`. Validation: bad address → `400 VALIDATION`; missing phone → `400`; unpaid
+invoice guard as above; `quantity > stock` → `409 OUT_OF_STOCK`. On live this page shows
+`DemoDataNotice`, so BE only needs the outcome contract above (the real Monnify rail can set the
+same fields) — mirroring the endpoint literally is optional.
 
 ### 1.2 `DELETE /api/v1/products/:id`
 
@@ -233,7 +243,7 @@ Legend: ✅ exists & wired · ⚠️ exists with gaps (item id) · ❌ missing �
 | Products list | ✓ | ✅ | ⚠️ R7, R8 | |
 | Products create/patch | ✓ | ✅ | ⚠️ V1–V4 | |
 | Products **delete** | ✓ | ✅ | ✅ §1.2 (handler shipped in this repo) | returns `409 PRODUCT_HAS_ORDERS` when referenced |
-| **Invoices** list/create/detail/cancel/public | ✓ | ✅ | ❌ §1.1 | **top priority** |
+| **Invoices** list/create/detail/cancel/public + **pay→order** | ✓ (share link → `/dashboard/redeem?code=`) | ✅ (§1.1, incl. `POST /invoices/:id/pay`) | ❌ §1.1 | **top priority**; live shows `DemoDataNotice` |
 | Seller public profile + reputation | — | ✅ (parity pass) | ✅ | storefront page planned |
 | Order assistant | ✓ buyer UI | ✅ (stub, canned reply) | ✅ | chat panel on buyer order detail |
 | Auth refresh | — | ✅ (parity pass) | ✅ | FE uses cookie flow |

@@ -76,6 +76,7 @@ export async function POST(request: Request) {
     seller_id: seller.id,
     name,
     price_kobo: Math.round(priceKobo),
+    dispatch_fee_kobo: Math.max(0, Math.round(Number(body.dispatch_fee_kobo) || 0)),
     description: String(body.description ?? "").trim(),
     image_url: String(body.image_url ?? "").trim(),
     stock_quantity: Math.max(0, Math.round(Number(body.stock_quantity) || 0)),

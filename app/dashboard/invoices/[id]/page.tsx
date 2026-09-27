@@ -311,6 +311,18 @@ export default function InvoiceDetailPage() {
                 <Amount value={invoice.product_kobo / 100} />
               </span>
             </Row>
+            {invoice.total_kobo > invoice.product_kobo && (
+              <Row label="Dispatch fee">
+                <span className="tabular-nums">
+                  <Amount
+                    value={
+                      (invoice.dispatch_fee_kobo ??
+                        invoice.total_kobo - invoice.product_kobo) / 100
+                    }
+                  />
+                </span>
+              </Row>
+            )}
             <Row label="Total amount due" strong>
               <span className="tabular-nums">
                 <Amount value={invoice.total_kobo / 100} />

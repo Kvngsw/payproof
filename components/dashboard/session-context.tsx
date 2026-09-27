@@ -97,3 +97,15 @@ export function useRequireSeller() {
     }
   }, [session, router]);
 }
+
+export function useRequireBuyer() {
+  const router = useRouter();
+  const session = useDashboardSession();
+
+  useEffect(() => {
+    if (session.status === "authed" && session.data.role === "seller") {
+      toast.info("That page is for buyers only. Taking you home.");
+      router.replace("/dashboard");
+    }
+  }, [session, router]);
+}

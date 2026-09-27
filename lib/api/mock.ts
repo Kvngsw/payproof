@@ -147,6 +147,7 @@ export type MockOrder = {
   };
   delivery_days: number;
   delivery_address: string;
+  phone?: string;
   tracking: {
     status: string | null;
     number: string | null;
@@ -272,6 +273,7 @@ export type MockProduct = {
   id: string;
   name: string;
   price_kobo: number;
+  dispatch_fee_kobo: number;
   description: string;
   image_url: string;
   stock_quantity: number;
@@ -291,6 +293,7 @@ export type MockInvoice = {
   seller_id: string;
   items: MockInvoiceItem[];
   product_kobo: number;
+  dispatch_fee_kobo: number;
   total_kobo: number;
   customer: { name: string; contact: string };
   note: string;
@@ -362,7 +365,18 @@ export async function getInvoice(id: string): Promise<MockInvoice> {
   return handleResponse(res);
 }
 
+export async function payInvoice(
+  id: string,
+  payload: { delivery_address: string; phone: string },
+): Promise<{ order_id: string }> {
+  return authFetch(`/invoices/${encodeURIComponent(id)}/pay`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function invoiceLink(id: string) {
-  if (typeof window === "undefined") return `/invoice/${id}`;
-  return `${window.location.origin}/invoice/${id}`;
+  const path = `/dashboard/redeem?code=${encodeURIComponent(id)}`;
+  if (typeof window === "undefined") return path;
+  return `${window.location.origin}${path}`;
 }

@@ -22,6 +22,7 @@ const NAV_ITEMS: Record<"seller" | "buyer", NavItem[]> = {
   ],
   buyer: [
     { label: "Home", href: "/dashboard" },
+    { label: "Pay invoice", href: "/dashboard/redeem" },
     { label: "Orders", href: "/dashboard/orders" },
   ],
 };
@@ -43,7 +44,10 @@ export function DashboardNavbar() {
   const role =
     session.status === "authed" ? session.data.role : ("seller" as const);
   const navItems = NAV_ITEMS[role].filter(
-    (item) => source !== "live" || item.href !== "/dashboard/invoices",
+    (item) =>
+      source !== "live" ||
+      (item.href !== "/dashboard/invoices" &&
+        item.href !== "/dashboard/redeem"),
   );
 
   const profile = session.status === "authed" ? session.data.profile : null;

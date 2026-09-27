@@ -164,6 +164,13 @@ export function getInvoice(id: string) {
   return isLive() ? live.getInvoice() : mock.getInvoice(id);
 }
 
+export function payInvoice(
+  id: string,
+  payload: { delivery_address: string; phone: string },
+) {
+  return isLive() ? live.payInvoice() : mock.payInvoice(id, payload);
+}
+
 export function invoiceLink(id: string) {
   return mock.invoiceLink(id);
 }

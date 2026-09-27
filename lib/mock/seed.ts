@@ -324,6 +324,7 @@ export function ensureOrdersForSeller(seller: any) {
 export const SEED_PRODUCTS = [
   {
     name: "Air Runner Sneakers",
+    dispatch_fee_kobo: 250000,
     price_kobo: 4500000,
     stock_quantity: 12,
     description: "Lightweight running sneakers with a cushioned sole.",
@@ -331,6 +332,7 @@ export const SEED_PRODUCTS = [
   },
   {
     name: "Court Classic Loafers",
+    dispatch_fee_kobo: 300000,
     price_kobo: 3200000,
     stock_quantity: 8,
     description: "Classic leather loafers for court and street.",
@@ -338,6 +340,7 @@ export const SEED_PRODUCTS = [
   },
   {
     name: "Canvas Slip-Ons",
+    dispatch_fee_kobo: 250000,
     price_kobo: 2800000,
     stock_quantity: 20,
     description: "Everyday canvas slip-ons, easy on and off.",
@@ -345,6 +348,7 @@ export const SEED_PRODUCTS = [
   },
   {
     name: "Retro High Tops",
+    dispatch_fee_kobo: 300000,
     price_kobo: 5100000,
     stock_quantity: 5,
     description: "Retro high-top sneakers with a padded collar.",
@@ -352,6 +356,7 @@ export const SEED_PRODUCTS = [
   },
   {
     name: "Trail Hiker Boots",
+    dispatch_fee_kobo: 350000,
     price_kobo: 6750000,
     stock_quantity: 0,
     description: "Waterproof trail boots for rough terrain.",
@@ -359,6 +364,7 @@ export const SEED_PRODUCTS = [
   },
   {
     name: "Suede Chukka Boots",
+    dispatch_fee_kobo: 300000,
     price_kobo: 5400000,
     stock_quantity: 6,
     description: "Soft suede chukka boots, smart casual fit.",
@@ -448,20 +454,33 @@ export function ensureInvoicesForSeller(seller: any) {
   );
 
   db.invoices.insertMany(
-    SEED_INVOICES.map((invoice) => ({
-      ...invoice,
-      seller_id: seller.id,
-      order_id: null,
-      paid_at: null,
-      items: invoice.items.map((item) => ({
-        product_id:
-          productIdByName.get(item.product_name) ?? generateId(),
+    SEED_INVOICES.map((invoice) => {
+      const items = invoice.items.map((item) => ({
+        product_id: productIdByName.get(item.product_name) ?? generateId(),
         name: item.product_name,
         image_url: item.image_url,
         quantity: item.quantity,
         unit_price_kobo: item.unit_price_kobo,
-      })),
-    })),
+      }));
+      const dispatchKobo = Math.max(
+        0,
+        ...items.map((item) => {
+          const product = products.find(
+            (p: { id: string }) => p.id === item.product_id,
+          );
+          return Number(product?.dispatch_fee_kobo) || 0;
+        }),
+      );
+      return {
+        ...invoice,
+        seller_id: seller.id,
+        dispatch_fee_kobo: dispatchKobo,
+        total_kobo: invoice.product_kobo + dispatchKobo,
+        order_id: null,
+        paid_at: null,
+        items,
+      };
+    }),
   );
 }
 

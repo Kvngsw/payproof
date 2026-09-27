@@ -178,6 +178,27 @@ export function BuyerHome() {
           </dl>
         </section>
       </div>
+
+      <section className="rounded-xl border border-dashed border-border/60 bg-card p-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-medium text-muted-foreground">
+              Have an invoice?
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Enter the code your seller shared to pay and track it as an
+              order.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => router.push("/dashboard/redeem")}
+          >
+            Pay invoice
+            <IconArrowRight className="size-4" />
+          </Button>
+        </div>
+      </section>
     </div>
   );
 }

@@ -70,6 +70,7 @@ export async function POST(request: Request) {
   const sellerProducts = db.products.findBySeller(seller.id);
   const items: any[] = [];
   const seen = new Set<string>();
+  let dispatchKobo = 0;
 
   for (const raw of rawItems) {
     const productId = String(raw?.product_id ?? "");
@@ -116,6 +117,10 @@ export async function POST(request: Request) {
       );
     }
     seen.add(product.id);
+    dispatchKobo = Math.max(
+      dispatchKobo,
+      Number(product.dispatch_fee_kobo) || 0,
+    );
     items.push({
       product_id: product.id,
       name: product.name,
@@ -144,7 +149,8 @@ export async function POST(request: Request) {
     seller_id: seller.id,
     items,
     product_kobo: subtotalKobo,
-    total_kobo: subtotalKobo,
+    dispatch_fee_kobo: dispatchKobo,
+    total_kobo: subtotalKobo + dispatchKobo,
     customer: {
       name: customerName,
       contact: String(body.customer_contact ?? "").trim(),

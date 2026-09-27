@@ -165,6 +165,8 @@ function normalizeProduct(raw: {
   name: string;
   price_kobo?: number;
   priceKobo?: number;
+  dispatch_fee_kobo?: number;
+  dispatchFeeKobo?: number;
   description?: string;
   image_url?: string;
   imageUrl?: string;
@@ -177,6 +179,7 @@ function normalizeProduct(raw: {
     id: raw.id,
     name: raw.name,
     price_kobo: raw.price_kobo ?? raw.priceKobo ?? 0,
+    dispatch_fee_kobo: raw.dispatch_fee_kobo ?? raw.dispatchFeeKobo ?? 0,
     description: raw.description ?? "",
     image_url: raw.image_url ?? raw.imageUrl ?? "",
     stock_quantity: raw.stock_quantity ?? raw.stockQuantity ?? 0,
@@ -521,5 +524,9 @@ export async function cancelInvoice(): Promise<MockInvoice> {
 }
 
 export async function getInvoice(): Promise<MockInvoice> {
+  throw new Error(INVOICES_LIVE_HINT);
+}
+
+export async function payInvoice(): Promise<{ order_id: string }> {
   throw new Error(INVOICES_LIVE_HINT);
 }
