@@ -10,7 +10,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { name, email, password, phone, business_name } = body;
 
-    if (!name || !email || !password || !phone || !business_name) {
+    if (!name || !email || !password) {
       return NextResponse.json(
         { error: { code: "VALIDATION", message: "Missing required fields" } },
         { status: 400 }
@@ -32,15 +32,16 @@ export async function POST(request: Request) {
 
     const reserved_account_number = "99" + Math.floor(10000000 + Math.random() * 90000000);
     const reserved_bank = "Wema Bank";
-    const reserved_account_name = `PP-${business_name.toUpperCase()}`;
+    const displayName = String(business_name ?? "").trim() || String(name).trim();
+    const reserved_account_name = `PP-${displayName.toUpperCase()}`;
 
     const seller = {
       id,
       email,
       password_hash,
       name,
-      phone,
-      business_name,
+      phone: String(phone ?? "").trim(),
+      business_name: String(business_name ?? "").trim(),
       reserved_account_number,
       reserved_bank,
       reserved_account_name,

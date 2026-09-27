@@ -94,7 +94,7 @@ code is shown in the card banner on `/otp`, and the form accepts it directly).
 | Seller | `ada@kicks.com` | `demo1234` |
 | Buyer | `hauwa@example.com`, `kola@example.com`, `ngozi@example.com`, `bisi@example.com`, `chidi@example.com`, `amina@example.com`, `emeka@example.com`, `zainab@example.com`, `tunde@example.com` | `demo1234` |
 
-Sign-up: `/signup` → buyer (single form) or seller (multi-step wizard) → OTP → dashboard.
+Sign-up: `/signup` → buyer (single form) or seller (single form, name/email/password only) → OTP → dashboard. New sellers see a **Finish your profile** card on the dashboard home (business name, phone, BVN, settlement account — demo data).
 
 ---
 

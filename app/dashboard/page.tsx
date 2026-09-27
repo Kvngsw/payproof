@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   getSellerDashboard,
   listInvoices,
+  updateProfile,
   type SellerDashboard,
   type MockInvoice,
 } from "@/lib/api";
@@ -19,11 +20,25 @@ import {
   IconMail,
   IconPhone,
   IconCalendar,
+  IconBuildingBank,
 } from "@tabler/icons-react";
 import { useDashboardSession } from "@/components/dashboard/session-context";
 import { useDataSource } from "@/lib/api";
 import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { BuyerHome } from "@/components/dashboard/buyer-home";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+
+type ProfileLike = {
+  name?: string;
+  email: string;
+  phone?: string;
+  business_name?: string;
+  bvn?: string;
+  settlement?: { bankCode: string; accountNumber: string } | null;
+  created_at?: string;
+};
 
 function PayoutLine({
   account,
@@ -33,7 +48,7 @@ function PayoutLine({
   if (!account) return null;
   return (
     <p className="text-xs text-muted-foreground">
-      Payouts are sent to {account.account_name} · {account.account_number} ·{" "}
+      Buyers pay into {account.account_name} · {account.account_number} ·{" "}
       {account.bank_name}.
     </p>
   );
@@ -96,17 +111,7 @@ function RecentInvoices({ invoices }: { invoices: MockInvoice[] | null }) {
   );
 }
 
-function SellerDetailsCard({
-  profile,
-}: {
-  profile: {
-    name?: string;
-    email: string;
-    phone?: string;
-    business_name?: string;
-    created_at?: string;
-  };
-}) {
+function SellerDetailsCard({ profile }: { profile: ProfileLike }) {
   const memberSince = profile.created_at
     ? new Date(profile.created_at).toLocaleDateString("en-NG", {
         month: "short",
@@ -118,6 +123,15 @@ function SellerDetailsCard({
     { icon: IconMail, label: "Email", value: profile.email },
     ...(profile.phone
       ? [{ icon: IconPhone, label: "Phone", value: profile.phone }]
+      : []),
+    ...(profile.settlement?.accountNumber
+      ? [
+          {
+            icon: IconBuildingBank,
+            label: "Payout account",
+            value: `${profile.settlement.accountNumber} · bank ${profile.settlement.bankCode}`,
+          },
+        ]
       : []),
     ...(memberSince
       ? [
@@ -160,6 +174,184 @@ function SellerDetailsCard({
           </div>
         ))}
       </dl>
+    </section>
+  );
+}
+
+function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
+  const source = useDataSource();
+  const { refresh } = useDashboardSession();
+  const [busy, setBusy] = useState(false);
+
+  const complete = Boolean(
+    profile.business_name?.trim() &&
+      profile.phone?.trim() &&
+      profile.bvn &&
+      profile.settlement?.bankCode &&
+      profile.settlement?.accountNumber,
+  );
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const business_name = String(form.get("business_name") ?? "").trim();
+    const phone = String(form.get("phone") ?? "").trim();
+    const bvn = String(form.get("bvn") ?? "").trim();
+    const bankCode = String(form.get("bank_code") ?? "").trim();
+    const accountNumber = String(form.get("account_number") ?? "").trim();
+
+    if (bvn && !/^\d{11}$/.test(bvn)) {
+      toast.error("BVN must be exactly 11 digits");
+      return;
+    }
+    if (accountNumber && !/^\d{10}$/.test(accountNumber)) {
+      toast.error("Settlement account number must be exactly 10 digits");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await updateProfile({
+        business_name,
+        phone,
+        bvn,
+        settlement:
+          bankCode && accountNumber ? { bankCode, accountNumber } : undefined,
+      });
+      refresh();
+      toast.success("Profile saved");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not save your profile",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (complete) return null;
+
+  if (source === "live") {
+    return (
+      <section className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
+        <div className="border-b border-dashed border-border/60 pb-3">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Finish your profile
+          </h2>
+        </div>
+        <p className="pt-4 text-sm leading-relaxed text-muted-foreground text-pretty">
+          Business, BVN and settlement details are saved after signup via the
+          profile update API (backend ask §1.4 A7 — not shipped yet). Switch to{" "}
+          <span className="font-medium text-foreground">Demo data</span> to try
+          the setup flow now.
+        </p>
+        {!profile.business_name && (
+          <p className="pt-2 text-sm text-muted-foreground">
+            Business name: not set yet.
+          </p>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-border/60 bg-card p-6 shadow-sm">
+      <div className="border-b border-dashed border-border/60 pb-3">
+        <h2 className="text-sm font-medium text-muted-foreground">
+          Finish your profile
+        </h2>
+      </div>
+      <p className="pt-4 text-sm leading-relaxed text-muted-foreground text-pretty">
+        Your business name shows on invoices and names your reserved account
+        where buyers pay in. BVN and settlement details tell us where payouts
+        land.
+      </p>
+      <form onSubmit={onSubmit} className="flex flex-col gap-5 pt-5">
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="setup-business">Business name</FieldLabel>
+            <Input
+              id="setup-business"
+              name="business_name"
+              autoComplete="organization"
+              placeholder="Ada's Kicks"
+              defaultValue={profile.business_name ?? ""}
+              required
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="setup-phone">Phone number</FieldLabel>
+            <Input
+              id="setup-phone"
+              name="phone"
+              type="tel"
+              autoComplete="tel"
+              placeholder="+234 800 000 0000"
+              defaultValue={profile.phone ?? ""}
+              required
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="setup-bvn">BVN</FieldLabel>
+            <Input
+              id="setup-bvn"
+              name="bvn"
+              inputMode="numeric"
+              autoComplete="off"
+              data-1p-ignore="true"
+              data-lpignore="true"
+              data-form-type="other"
+              placeholder="11-digit bank verification number"
+              pattern="\d{11}"
+              maxLength={11}
+              defaultValue={profile.bvn ?? ""}
+              required
+            />
+            <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
+              Used to verify your payout account. Never shown again after
+              saving.
+            </p>
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="setup-bank-code">Bank code</FieldLabel>
+              <Input
+                id="setup-bank-code"
+                name="bank_code"
+                inputMode="numeric"
+                autoComplete="off"
+                data-1p-ignore="true"
+                data-lpignore="true"
+                data-form-type="other"
+                placeholder="e.g. 035"
+                maxLength={10}
+                defaultValue={profile.settlement?.bankCode ?? ""}
+                required
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="setup-account">Account number</FieldLabel>
+              <Input
+                id="setup-account"
+                name="account_number"
+                inputMode="numeric"
+                autoComplete="off"
+                data-1p-ignore="true"
+                data-lpignore="true"
+                data-form-type="other"
+                placeholder="10-digit account number"
+                pattern="\d{10}"
+                maxLength={10}
+                defaultValue={profile.settlement?.accountNumber ?? ""}
+                required
+              />
+            </Field>
+          </div>
+        </FieldGroup>
+        <Button type="submit" disabled={busy} className="w-full sm:w-auto">
+          {busy ? "Saving..." : "Save profile"}
+        </Button>
+      </form>
     </section>
   );
 }
@@ -257,6 +449,8 @@ export default function DashboardPage() {
           </Button>
         </div>
       </header>
+
+      <ProfileSetupCard profile={profile} />
 
       <div className="space-y-3">
         {dashboard ? (

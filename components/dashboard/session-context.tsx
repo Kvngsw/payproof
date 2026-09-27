@@ -2,8 +2,10 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -19,6 +21,8 @@ export type MeResponse = {
     email: string;
     phone?: string;
     business_name?: string;
+    bvn?: string;
+    settlement?: { bankCode: string; accountNumber: string } | null;
     created_at?: string;
   };
   reserved_account?: {
@@ -33,7 +37,15 @@ type SessionState =
   | { status: "authed"; data: MeResponse }
   | { status: "error" };
 
-const SessionContext = createContext<SessionState>({ status: "loading" });
+type SessionContextValue = SessionState & {
+  /** Re-fetches /auth/me after a profile update (e.g. setup card). */
+  refresh: () => void;
+};
+
+const SessionContext = createContext<SessionContextValue>({
+  status: "loading",
+  refresh: () => {},
+});
 
 export function useDashboardSession() {
   return useContext(SessionContext);
@@ -81,9 +93,21 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     };
   }, [router]);
 
-  return (
-    <SessionContext.Provider value={state}>{children}</SessionContext.Provider>
+  const refresh = useCallback(() => {
+    if (!getToken()) return;
+    getMe()
+      .then((data) => setState({ status: "authed", data: data as MeResponse }))
+      .catch(() => {
+        /* keep current session — next full load handles expiry */
+      });
+  }, []);
+
+  const value = useMemo<SessionContextValue>(
+    () => ({ ...state, refresh }),
+    [state, refresh],
   );
+
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
 export function useRequireSeller() {

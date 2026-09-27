@@ -148,7 +148,7 @@ Missing entirely (route originally exposed GET+PATCH only). **Shipped in this re
 
 Sign-in is now **one email+password form for both roles** (no seller/buyer toggle), followed
 by a shared `/otp` page; sign-up is role-split at `/signup` → `/signup/buyer` or
-`/signup/seller` (seller is multi-step) and also ends on `/otp`. Mock implements all of it
+`/signup/seller` (seller is a single step) and also ends on `/otp`. Mock implements all of it
 (`app/api/mock/auth/**`); live needs the routes below. Until they exist, live-mode sign-in
 404s — the FE shows a friendly message and the deployed app defaults to Demo data.
 
@@ -157,9 +157,10 @@ by a shared `/otp` page; sign-up is role-split at `/signup` → `/signup/buyer` 
 | A1 | `POST /auth/login` | `{email,password}` → `202 {sent:true, role:"seller"\|"buyer"}` + OTP emailed; `401` generic `"Invalid email or password"` (don't leak which account exists) | password checked against `Seller.passwordHash` **or** `Buyer.passwordHash`; seller wins when both exist |
 | A2 | `POST /auth/otp/verify` | `{email,code}` → `200 {token, role}` — role of whichever account owns the email; keep existing OTP rules (attempts ≤5, 10-min expiry, rate limits) | FE stores the token, clears pending state, redirects to `next` |
 | A3 | `POST /auth/buyer/register` | `{name,email,password≥8}` → `202` + OTP; `409` duplicate | buyer OTP-verify **auto-create is dead** — buyers now register with a password |
-| A4 | `POST /auth/seller/register` | **breaking**: today `201 {token, seller, reserved_account}` → must return `202 {sent:true}` + OTP (no token until A2) | FE already treats `token` as optional in the response |
+| A4 | `POST /auth/seller/register` | **breaking**: today `201 {token, seller, reserved_account}` → must return `202 {sent:true}` + OTP (no token until A2); FE payload is now **`{name,email,password≥8}` only** (`phone`/`business_name` optional, `bvn`/`settlement` deferred to A7) | FE already treats `token` as optional in the response |
 | A5 | Prisma migration | `Buyer.passwordHash String?`, `Buyer.name String?` | A1 can't check a password that isn't stored; A3 has nowhere to put `name` |
 | A6 | OTP resend | keep `POST /auth/buyer/otp/request` as-is (it's role-agnostic — just an OTP row keyed by email), or rename to `/auth/otp/request` | the `/otp` page resend button calls it for both roles |
+| A7 | `PATCH /auth/me` | **new** (sellers): `{name?, phone?, business_name?, bvn?(11 digits), settlement?: {bankCode, accountNumber(10 digits)} | null}` → `200 {role:"seller", profile, reserved_account}`; regenerates `reserved_account_name` from `business_name` (fallback `name`) when either changes | FE's dashboard "Finish your profile" card collects business/phone/BVN/settlement *after* signup; mock ships this route now (`app/api/mock/auth/me/route.ts`) |
 
 **Deprecated (FE no longer calls; keep working so scripts don't break):**
 `POST /auth/seller/login` (token-direct), `POST /auth/buyer/otp/verify` (buyer-only token).
@@ -200,7 +201,7 @@ OR standardize on the spaced form in responses. FE ships a `STATUS_DISPLAY` map 
 | V2 | `POST /products` | `imageUrl` must be a valid URL if present | FE sends `""` for "no image" | accept `""` (treat as null) |
 | V3 | `POST/PATCH /products` | `description` ≥10 chars, **required** on create | form treats it as optional | make optional (default `""`) or FE pads — we pad today; deleting the padding when this lands is trivial |
 | V4 | `PATCH /products` | zod strips unknown keys — FE's snake_case payload (`price_kobo`, `stock_quantity`, `image_url`) is **silently ignored** | silent data loss if adapters regress | accept snake_case aliases (or both) |
-| V5 | `POST /auth/seller/register` | `bvn` (11 digits), `settlement.{bankCode,accountNumber}` required | **FE now collects these** in live mode ✓ — listed so nobody removes them; sandbox bank validation stays |
+| V5 | `POST /auth/seller/register` | `bvn` (11 digits), `settlement.{bankCode,accountNumber}` required | **flipped**: FE no longer sends these at register (single-step signup — collected post-signup via §1.4 A7) → relax to optional; keep the sandbox validation when values *are* present |
 | V6 | `POST .../tracking` | backward step → `400 VALIDATION` | mock returns `409` | align to `409 INVALID_TRANSITION` (FE maps both, cosmetic) |
 | V7 | OTP verify | code must be exactly `^\d{6}$` | FE now enforces digits via segmented OTP input ✓ | keep |
 
@@ -230,7 +231,8 @@ Legend: ✅ exists & wired · ⚠️ exists with gaps (item id) · ❌ missing �
 
 | Capability | FE consumer | mock API | v1 API | Notes |
 |---|---|---|---|---|
-| Seller register | ✓ (multi-step `/signup/seller`) | ✅ `202 + OTP` (§1.4 A4) | ⚠️ V5 + §1.4 A4 | v1 still returns a token directly |
+| Seller register | ✓ (single-step `/signup/seller`) | ✅ `202 + OTP` (§1.4 A4) | ⚠️ V5 + §1.4 A4 | v1 still returns a token directly |
+| Seller profile update (business/phone/BVN/settlement) | ✓ (home "Finish your profile" card) | ✅ `PATCH /auth/me` (§1.4 A7) | ❌ §1.4 A7 | card stays on `/dashboard` until complete; live shows a read-only note |
 | Seller login (password, token-direct) | **—** (replaced by Auth v2) | ✅ kept for scripts | ✅ kept for scripts | FE uses `POST /auth/login` now |
 | **Auth v2**: `POST /auth/login` + `otp/verify` + `buyer/register` | ✓ (single sign-in form, shared `/otp`) | ✅ | ❌ §1.4 (A1–A5) | live auth 404s until BE ships §1.4 — deployed default is Demo data |
 | OTP request/verify (legacy buyer flow) | ✓ resend only | ✅ (`dev_code` + card banner) | ✅ live sends SMTP email (nodemailer) — `SMTP_*` env required | verify issues buyer-only token; FE uses A2 instead |

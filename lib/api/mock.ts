@@ -15,8 +15,8 @@ export async function registerSeller(payload: {
   name: string;
   email: string;
   password: string;
-  phone: string;
-  business_name: string;
+  phone?: string;
+  business_name?: string;
   bvn?: string;
   settlement?: { bankCode: string; accountNumber: string };
 }) {
@@ -98,6 +98,46 @@ export async function getMe() {
   if (!token) throw new Error("Not authenticated");
   const res = await fetch(`${BASE}/me`, {
     headers: { Authorization: `Bearer ${token}` },
+  });
+  return handleResponse(res);
+}
+
+export type ProfilePatch = {
+  name?: string;
+  phone?: string;
+  business_name?: string;
+  bvn?: string;
+  settlement?: { bankCode: string; accountNumber: string } | null;
+};
+
+export type ProfileResponse = {
+  role: "seller";
+  profile: Record<string, unknown> & {
+    name?: string;
+    phone?: string;
+    business_name?: string;
+    bvn?: string;
+    settlement?: { bankCode: string; accountNumber: string } | null;
+  };
+  reserved_account: {
+    account_number: string;
+    bank_name: string;
+    account_name: string;
+  };
+};
+
+export async function updateProfile(
+  payload: ProfilePatch,
+): Promise<ProfileResponse> {
+  const token = getToken();
+  if (!token) throw new Error("Not authenticated");
+  const res = await fetch(`${BASE}/me`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
   });
   return handleResponse(res);
 }

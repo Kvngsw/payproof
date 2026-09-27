@@ -21,6 +21,7 @@ export type {
   MockInvoice,
   OrderPayout,
   AssistantReply,
+  ProfilePatch,
 } from "./mock";
 
 const isLive = () => getDataSource() === "live";
@@ -61,6 +62,10 @@ export function verifyOtp(email: string, code: string) {
 
 export function getMe() {
   return isLive() ? live.getMe() : mock.getMe();
+}
+
+export function updateProfile(payload: Parameters<typeof mock.updateProfile>[0]) {
+  return isLive() ? live.updateProfile() : mock.updateProfile(payload);
 }
 
 export function getSellerDashboard() {

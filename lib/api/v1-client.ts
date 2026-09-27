@@ -195,8 +195,8 @@ export async function registerSeller(payload: {
   name: string;
   email: string;
   password: string;
-  phone: string;
-  business_name: string;
+  phone?: string;
+  business_name?: string;
   bvn?: string;
   settlement?: { bankCode: string; accountNumber: string };
 }) {
@@ -318,6 +318,8 @@ export async function getMe() {
       email: profile.email,
       phone: profile.phone,
       business_name: profile.businessName,
+      bvn: profile.bvn,
+      settlement: profile.settlement,
       reserved_account_number: reserved?.account_number,
       reserved_bank: reserved?.bank_name,
       reserved_account_name: reserved?.account_name,
@@ -529,4 +531,15 @@ export async function getInvoice(): Promise<MockInvoice> {
 
 export async function payInvoice(): Promise<{ order_id: string }> {
   throw new Error(INVOICES_LIVE_HINT);
+}
+
+// ---------------------------------------------------------------------------
+// Profile update: not implemented on the backend yet (docs/api-requests.md §1.4 A7)
+// ---------------------------------------------------------------------------
+
+const PROFILE_LIVE_HINT =
+  "Profile editing runs on demo data for now — switch the data source to Demo data.";
+
+export async function updateProfile(): Promise<never> {
+  throw new Error(PROFILE_LIVE_HINT);
 }
