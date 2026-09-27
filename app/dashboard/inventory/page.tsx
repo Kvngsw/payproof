@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldError } from "@/components/ui/field";
 import {
   Table,
   TableBody,
@@ -37,6 +38,13 @@ import {
 import { useDashboardSession, useRequireSeller } from "@/components/dashboard/session-context";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
 import { Amount } from "@/components/amount";
+import {
+  first,
+  hasErrors,
+  pattern,
+  required,
+  type FieldErrors,
+} from "@/lib/form";
 import { IconPlus, IconDots, IconPencil, IconTrash } from "@tabler/icons-react";
 
 type FormState = {
@@ -92,6 +100,15 @@ export default function InventoryPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [busy, setBusy] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<MockProduct | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
+
+  function updateForm(patch: Partial<FormState>) {
+    setForm((f) => ({ ...f, ...patch }));
+  }
+
+  function clearError(key: string) {
+    setErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  }
 
   useEffect(() => {
     if (session.status !== "authed") return;
@@ -111,32 +128,41 @@ export default function InventoryPage() {
   function openAdd() {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setErrors({});
     setSheetOpen(true);
   }
 
   function openEdit(product: MockProduct) {
     setEditing(product);
     setForm(toForm(product));
+    setErrors({});
     setSheetOpen(true);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const name = form.name.trim();
-    const price = Number(form.price);
-    if (!name) {
-      toast.error("Product name is required");
-      return;
-    }
-    if (!Number.isFinite(price) || price <= 0) {
-      toast.error("Enter a price greater than zero");
-      return;
-    }
+    const price = form.price;
+    const nextErrors: FieldErrors = {
+      name: required(name, "Product name"),
+      price: first(
+        required(price, "Price"),
+        pattern(price.trim(), /^\d+(\.\d+)?$/, "Enter a valid price"),
+        Number(price) > 0 ? undefined : "Enter a price greater than zero",
+      ),
+      stock: pattern(
+        form.stock.trim(),
+        /^\d+$/,
+        "Stock must be a whole number",
+      ),
+    };
+    setErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
 
     setBusy(true);
     const payload = {
       name,
-      price_kobo: Math.round(price * 100),
+      price_kobo: Math.round(Number(price) * 100),
       stock_quantity: Math.max(0, Math.round(Number(form.stock) || 0)),
       description: form.description.trim(),
       image_url: form.image_url.trim(),
@@ -320,6 +346,7 @@ export default function InventoryPage() {
 
           <form
             onSubmit={handleSubmit}
+            noValidate
             className="flex min-h-0 flex-1 flex-col"
           >
             <div className="flex-1 space-y-4 overflow-y-auto px-6">
@@ -329,11 +356,14 @@ export default function InventoryPage() {
                   id="product-name"
                   placeholder="Air Runner Sneakers"
                   value={form.name}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, name: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    updateForm({ name: e.target.value });
+                    clearError("name");
+                  }}
                   required
+                  aria-invalid={errors.name ? true : undefined}
                 />
+                <FieldError>{errors.name}</FieldError>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -346,11 +376,14 @@ export default function InventoryPage() {
                     step="any"
                     placeholder="45000"
                     value={form.price}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, price: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      updateForm({ price: e.target.value });
+                      clearError("price");
+                    }}
                     required
+                    aria-invalid={errors.price ? true : undefined}
                   />
+                  <FieldError>{errors.price}</FieldError>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="product-stock">Stock</Label>
@@ -360,10 +393,13 @@ export default function InventoryPage() {
                     min="0"
                     placeholder="10"
                     value={form.stock}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, stock: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      updateForm({ stock: e.target.value });
+                      clearError("stock");
+                    }}
+                    aria-invalid={errors.stock ? true : undefined}
                   />
+                  <FieldError>{errors.stock}</FieldError>
                 </div>
               </div>
 
@@ -373,9 +409,7 @@ export default function InventoryPage() {
                   id="product-description"
                   placeholder="Lightweight running sneakers"
                   value={form.description}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, description: e.target.value }))
-                  }
+                  onChange={(e) => updateForm({ description: e.target.value })}
                 />
               </div>
 
@@ -391,9 +425,7 @@ export default function InventoryPage() {
                     id="product-image"
                     placeholder="https://..."
                     value={form.image_url}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, image_url: e.target.value }))
-                    }
+                    onChange={(e) => updateForm({ image_url: e.target.value })}
                   />
                 </div>
               </div>

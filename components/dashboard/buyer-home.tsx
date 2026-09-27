@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldError } from "@/components/ui/field";
 import { Amount } from "@/components/amount";
 import { StatusChip } from "@/components/status-chip";
 import {
@@ -21,6 +22,13 @@ import { useDashboardSession } from "@/components/dashboard/session-context";
 import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
 import { InvoiceStatusChip } from "@/components/dashboard/invoice-status-chip";
+import {
+  first,
+  hasErrors,
+  minLength,
+  required,
+  type FieldErrors,
+} from "@/lib/form";
 import {
   IconArrowRight,
   IconArrowLeft,
@@ -179,6 +187,7 @@ export function BuyerHome() {
   const [address, setAddress] = useState("");
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
+  const [payErrors, setPayErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
     if (session.status !== "authed") return;
@@ -263,6 +272,7 @@ export function BuyerHome() {
     setCodeDraft("");
     setAddress("");
     setPhone("");
+    setPayErrors({});
     router.replace("/dashboard");
   }
 
@@ -271,14 +281,15 @@ export function BuyerHome() {
     if (!invoice) return;
 
     const trimmedAddress = address.trim();
-    if (trimmedAddress.length < 10) {
-      toast.error("Delivery address must be at least 10 characters");
-      return;
-    }
-    if (!phone.trim()) {
-      toast.error("Phone number is required");
-      return;
-    }
+    const nextErrors: FieldErrors = {
+      address: first(
+        required(address, "Delivery address"),
+        minLength(address.trim(), 10, "Delivery address"),
+      ),
+      phone: required(phone, "Phone number"),
+    };
+    setPayErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
 
     setBusy(true);
     try {
@@ -484,7 +495,11 @@ export function BuyerHome() {
               </div>
             </dl>
 
-            <form className="mt-5 space-y-4" onSubmit={handlePay}>
+            <form
+              className="mt-5 space-y-4"
+              onSubmit={handlePay}
+              noValidate
+            >
               <div className="space-y-1.5">
                 <Label
                   htmlFor="delivery-address"
@@ -495,12 +510,18 @@ export function BuyerHome() {
                 <textarea
                   id="delivery-address"
                   value={address}
-                  onChange={(event) => setAddress(event.target.value)}
+                  onChange={(event) => {
+                    setAddress(event.target.value);
+                    if (payErrors.address)
+                      setPayErrors((prev) => ({ ...prev, address: undefined }));
+                  }}
                   placeholder="Street, area, city, state"
                   required
                   minLength={10}
+                  aria-invalid={payErrors.address ? true : undefined}
                   className="min-h-20 w-full rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-base outline-none transition-[color,box-shadow,border-color] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"
                 />
+                <FieldError>{payErrors.address}</FieldError>
               </div>
               <div className="space-y-1.5">
                 <Label
@@ -513,10 +534,16 @@ export function BuyerHome() {
                   id="phone"
                   type="tel"
                   value={phone}
-                  onChange={(event) => setPhone(event.target.value)}
+                  onChange={(event) => {
+                    setPhone(event.target.value);
+                    if (payErrors.phone)
+                      setPayErrors((prev) => ({ ...prev, phone: undefined }));
+                  }}
                   placeholder="0801 234 5678"
                   required
+                  aria-invalid={payErrors.phone ? true : undefined}
                 />
+                <FieldError>{payErrors.phone}</FieldError>
               </div>
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy ? "Confirming payment..." : "Pay & create order"}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { IconShieldCheck } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
-import { FieldGroup } from "@/components/ui/field";
+import { FieldError, FieldGroup } from "@/components/ui/field";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { DashedLine } from "@/components/auth/dashed-line";
 import { verifyAuthOtp, requestOtp } from "@/lib/api";
@@ -32,6 +32,7 @@ export default function OtpPage() {
   const [devCode, setDevCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [codeError, setCodeError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     // Deferred so state isn't set synchronously inside the effect; sessionStorage
@@ -68,9 +69,10 @@ export default function OtpPage() {
     event.preventDefault();
     if (!pending) return;
     if (!/^\d{6}$/.test(otpCode)) {
-      toast.error("Enter the 6-digit code");
+      setCodeError("Enter the 6-digit code");
       return;
     }
+    setCodeError(undefined);
     setLoading(true);
     try {
       await verifyAuthOtp(pending.email, otpCode);
@@ -78,7 +80,12 @@ export default function OtpPage() {
       toast.success("Signed in!");
       router.push(safeNext(pending.next));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "An error occurred");
+      const status = err instanceof Error ? (err as { status?: number }).status : undefined;
+      if (err instanceof Error && (status === 400 || status === 401)) {
+        setCodeError(err.message);
+      } else {
+        toast.error(err instanceof Error ? err.message : "An error occurred");
+      }
     } finally {
       setLoading(false);
     }
@@ -91,6 +98,7 @@ export default function OtpPage() {
       const res = await requestOtp(pending.email);
       setDevCode(res.dev_code ?? null);
       setOtpCode("");
+      setCodeError(undefined);
       toast.success("New code sent!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "An error occurred");
@@ -129,16 +137,20 @@ export default function OtpPage() {
 
         <DashedLine />
 
-        <form onSubmit={onSubmit} className="flex flex-col gap-5 px-6 py-6">
+        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5 px-6 py-6">
           <FieldGroup>
             <div className="flex flex-col items-center gap-3">
               <InputOTP
                 id="code"
                 value={otpCode}
-                onChange={setOtpCode}
+                onChange={(next) => {
+                  setOtpCode(next);
+                  if (codeError) setCodeError(undefined);
+                }}
                 maxLength={6}
                 autoComplete="one-time-code"
                 inputMode="numeric"
+                aria-invalid={codeError ? true : undefined}
                 autoFocus
               >
                 <InputOTPGroup>
@@ -147,6 +159,7 @@ export default function OtpPage() {
                   ))}
                 </InputOTPGroup>
               </InputOTP>
+              <FieldError>{codeError}</FieldError>
               {devCode && (
                 <div className="w-full rounded-xl border border-primary/30 bg-primary/10 p-3 text-center text-xs text-foreground">
                   <span className="font-bold text-primary">DEV MODE:</span>{" "}

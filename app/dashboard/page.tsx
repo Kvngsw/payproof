@@ -26,8 +26,15 @@ import { useDashboardSession } from "@/components/dashboard/session-context";
 import { useDataSource } from "@/lib/api";
 import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { BuyerHome } from "@/components/dashboard/buyer-home";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  first,
+  hasErrors,
+  pattern,
+  required,
+  type FieldErrors,
+} from "@/lib/form";
 import { toast } from "sonner";
 
 type ProfileLike = {
@@ -182,6 +189,11 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
   const source = useDataSource();
   const { refresh } = useDashboardSession();
   const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
+
+  function clearError(key: string) {
+    setErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  }
 
   const complete = Boolean(
     profile.business_name?.trim() &&
@@ -200,14 +212,24 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
     const bankCode = String(form.get("bank_code") ?? "").trim();
     const accountNumber = String(form.get("account_number") ?? "").trim();
 
-    if (bvn && !/^\d{11}$/.test(bvn)) {
-      toast.error("BVN must be exactly 11 digits");
-      return;
-    }
-    if (accountNumber && !/^\d{10}$/.test(accountNumber)) {
-      toast.error("Settlement account number must be exactly 10 digits");
-      return;
-    }
+    const nextErrors: FieldErrors = {
+      business_name: required(business_name, "Business name"),
+      phone: required(phone, "Phone number"),
+      bvn: first(
+        required(bvn, "BVN"),
+        pattern(bvn, /^\d{11}$/, "BVN must be exactly 11 digits"),
+      ),
+      bank_code: first(
+        required(bankCode, "Bank code"),
+        pattern(bankCode, /^\d+$/, "Bank code must be digits"),
+      ),
+      account_number: first(
+        required(accountNumber, "Account number"),
+        pattern(accountNumber, /^\d{10}$/, "Account number must be exactly 10 digits"),
+      ),
+    };
+    setErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
 
     setBusy(true);
     try {
@@ -215,8 +237,7 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
         business_name,
         phone,
         bvn,
-        settlement:
-          bankCode && accountNumber ? { bankCode, accountNumber } : undefined,
+        settlement: { bankCode, accountNumber },
       });
       refresh();
       toast.success("Profile saved");
@@ -266,7 +287,7 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
         where buyers pay in. BVN and settlement details tell us where payouts
         land.
       </p>
-      <form onSubmit={onSubmit} className="flex flex-col gap-5 pt-5">
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-5">
         <FieldGroup>
           <Field>
             <FieldLabel htmlFor="setup-business">Business name</FieldLabel>
@@ -277,7 +298,10 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
               placeholder="Ada's Kicks"
               defaultValue={profile.business_name ?? ""}
               required
+              aria-invalid={errors.business_name ? true : undefined}
+              onChange={() => clearError("business_name")}
             />
+            <FieldError>{errors.business_name}</FieldError>
           </Field>
           <Field>
             <FieldLabel htmlFor="setup-phone">Phone number</FieldLabel>
@@ -289,7 +313,10 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
               placeholder="+234 800 000 0000"
               defaultValue={profile.phone ?? ""}
               required
+              aria-invalid={errors.phone ? true : undefined}
+              onChange={() => clearError("phone")}
             />
+            <FieldError>{errors.phone}</FieldError>
           </Field>
           <Field>
             <FieldLabel htmlFor="setup-bvn">BVN</FieldLabel>
@@ -306,7 +333,10 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
               maxLength={11}
               defaultValue={profile.bvn ?? ""}
               required
+              aria-invalid={errors.bvn ? true : undefined}
+              onChange={() => clearError("bvn")}
             />
+            <FieldError>{errors.bvn}</FieldError>
             <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
               Used to verify your payout account. Never shown again after
               saving.
@@ -327,7 +357,10 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
                 maxLength={10}
                 defaultValue={profile.settlement?.bankCode ?? ""}
                 required
+                aria-invalid={errors.bank_code ? true : undefined}
+                onChange={() => clearError("bank_code")}
               />
+              <FieldError>{errors.bank_code}</FieldError>
             </Field>
             <Field>
               <FieldLabel htmlFor="setup-account">Account number</FieldLabel>
@@ -344,7 +377,10 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
                 maxLength={10}
                 defaultValue={profile.settlement?.accountNumber ?? ""}
                 required
+                aria-invalid={errors.account_number ? true : undefined}
+                onChange={() => clearError("account_number")}
               />
+              <FieldError>{errors.account_number}</FieldError>
             </Field>
           </div>
         </FieldGroup>

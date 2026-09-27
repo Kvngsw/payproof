@@ -8,11 +8,13 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldError } from "@/components/ui/field";
 import {
   createInvoice,
   listProducts,
   type MockProduct,
 } from "@/lib/api/mock";
+import { hasErrors, required, type FieldErrors } from "@/lib/form";
 import { useDashboardSession, useRequireSeller } from "@/components/dashboard/session-context";
 import { useDataSource } from "@/lib/api";
 import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
@@ -47,6 +49,7 @@ export default function NewInvoicePage() {
   const [note, setNote] = useState("");
   const [code] = useState(() => makeCode());
   const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
     if (session.status !== "authed") return;
@@ -74,6 +77,7 @@ export default function NewInvoicePage() {
   const totalKobo = subtotalKobo;
 
   function setQty(product: MockProduct, qty: number) {
+    if (errors.items) setErrors((prev) => ({ ...prev, items: undefined }));
     setSelected((prev) => {
       const next = { ...prev };
       if (qty <= 0) delete next[product.id];
@@ -100,14 +104,12 @@ export default function NewInvoicePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (chosen.length === 0) {
-      toast.error("Pick at least one product for this invoice");
-      return;
-    }
-    if (!customerName.trim()) {
-      toast.error("Customer name is required");
-      return;
-    }
+    const nextErrors: FieldErrors = {
+      items: chosen.length === 0 ? "Pick at least one product for this invoice" : undefined,
+      name: required(customerName, "Customer name"),
+    };
+    setErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
 
     setBusy(true);
     try {
@@ -142,6 +144,7 @@ export default function NewInvoicePage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
         <form
           onSubmit={handleSubmit}
+          noValidate
           className="space-y-6 rounded-xl border border-border/60 bg-card p-6 shadow-sm lg:col-start-2 lg:row-start-1"
         >
           <div>
@@ -251,6 +254,7 @@ export default function NewInvoicePage() {
                 })}
               </div>
             )}
+            <FieldError>{errors.items}</FieldError>
           </div>
 
           <div className="space-y-3">
@@ -263,9 +267,15 @@ export default function NewInvoicePage() {
                 id="customer-name"
                 placeholder="Chinedu Okafor"
                 value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+                onChange={(e) => {
+                  setCustomerName(e.target.value);
+                  if (errors.name)
+                    setErrors((prev) => ({ ...prev, name: undefined }));
+                }}
                 required
+                aria-invalid={errors.name ? true : undefined}
               />
+              <FieldError>{errors.name}</FieldError>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="customer-contact">Email or phone (optional)</Label>

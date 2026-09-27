@@ -5,38 +5,61 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { IconShieldCheck } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/auth/password-input";
 import { DashedLine } from "@/components/auth/dashed-line";
 import { DataSourceToggle } from "@/components/dashboard/data-source-switch";
 import { login } from "@/lib/api";
 import { setPendingAuth, safeNext } from "@/lib/auth-pending";
+import {
+  email as emailCheck,
+  first,
+  hasErrors,
+  required,
+  type FieldErrors,
+} from "@/lib/form";
 import { toast } from "sonner";
 
 export default function SigninPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
+
+  function clearError(key: string) {
+    setErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLoading(true);
 
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "");
+    const password = String(formData.get("password") ?? "");
+    const nextErrors: FieldErrors = {
+      email: first(required(email, "Email"), emailCheck(email)),
+      password: required(password, "Password"),
+    };
+    setErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
+
+    setLoading(true);
     try {
-      const formData = new FormData(event.currentTarget);
-      const email = formData.get("email") as string;
-      const password = formData.get("password") as string;
       const params = new URLSearchParams(window.location.search);
       const next = safeNext(params.get("next") ?? undefined);
 
-      const res = await login({ email, password });
-      setPendingAuth({ email, purpose: "login", next, dev_code: res.dev_code });
+      const res = await login({ email: email.trim(), password });
+      setPendingAuth({ email: email.trim(), purpose: "login", next, dev_code: res.dev_code });
       if (!res.dev_code) {
         toast.success("Code sent to your email!");
       }
       router.push("/otp");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "An error occurred");
+      if (err instanceof Error && (err as { status?: number }).status === 401) {
+        setErrors({ form: "Wrong email or password." });
+      } else {
+        toast.error(err instanceof Error ? err.message : "An error occurred");
+      }
     } finally {
       setLoading(false);
     }
@@ -59,7 +82,7 @@ export default function SigninPage() {
 
         <DashedLine />
 
-        <form onSubmit={onSubmit} className="flex flex-col gap-5 px-6 py-6">
+        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5 px-6 py-6">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-medium text-muted-foreground">
               Data source
@@ -77,7 +100,10 @@ export default function SigninPage() {
                 autoComplete="email"
                 placeholder="you@example.com"
                 required
+                aria-invalid={errors.email ? true : undefined}
+                onChange={() => clearError("email")}
               />
+              <FieldError>{errors.email}</FieldError>
             </Field>
             <Field>
               <FieldLabel htmlFor="password">Password</FieldLabel>
@@ -87,12 +113,17 @@ export default function SigninPage() {
                 autoComplete="current-password"
                 placeholder="Your password"
                 required
+                aria-invalid={errors.password ? true : undefined}
+                onChange={() => clearError("password")}
               />
+              <FieldError>{errors.password}</FieldError>
               <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
                 We&apos;ll email you a one-time code to finish signing in.
               </p>
             </Field>
           </FieldGroup>
+
+          <FieldError>{errors.form}</FieldError>
 
           <Button type="submit" size="lg" className="w-full" disabled={loading}>
             {loading ? "Processing..." : "Continue"}

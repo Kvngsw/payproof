@@ -17,15 +17,22 @@ async function handleResponse(res: Response) {
   const contentType = res.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
     // Unmatched route → Next serves an HTML 404/500 page, not a JSON error.
-    throw new Error(
+    const error = new Error(
       res.status === 404
         ? "This isn't available on the Live API yet — switch the data source to Demo data."
         : `Request failed (${res.status})`,
-    );
+    ) as Error & { status?: number };
+    error.status = res.status;
+    throw error;
   }
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error?.message || "Request failed");
+    const error = new Error(
+      data.error?.message || "Request failed",
+    ) as Error & { status?: number; code?: string };
+    error.status = res.status;
+    error.code = data.error?.code;
+    throw error;
   }
   return data;
 }

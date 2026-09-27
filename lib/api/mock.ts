@@ -6,7 +6,12 @@ import { getToken, setToken } from "./source";
 async function handleResponse(res: Response) {
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.error?.message || "Request failed");
+    const error = new Error(
+      data.error?.message || "Request failed",
+    ) as Error & { status?: number; code?: string };
+    error.status = res.status;
+    error.code = data.error?.code;
+    throw error;
   }
   return data;
 }

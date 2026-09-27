@@ -5,18 +5,32 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { IconShieldCheck } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/auth/password-input";
 import { DashedLine } from "@/components/auth/dashed-line";
 import { DataSourceToggle } from "@/components/dashboard/data-source-switch";
 import { registerSeller } from "@/lib/api";
 import { setPendingAuth } from "@/lib/auth-pending";
+import {
+  email as emailCheck,
+  first,
+  hasErrors,
+  match,
+  minLength,
+  required,
+  type FieldErrors,
+} from "@/lib/form";
 import { toast } from "sonner";
 
 export default function SignupSellerPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
+
+  function clearError(key: string) {
+    setErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,14 +43,28 @@ export default function SignupSellerPage() {
       const password = String(formData.get("password") ?? "");
       const confirm = String(formData.get("confirm") ?? "");
 
-      if (password !== confirm) {
-        toast.error("Passwords don't match");
-        return;
-      }
+      const nextErrors: FieldErrors = {
+        name: required(name, "Full name"),
+        email: first(required(email, "Email"), emailCheck(email)),
+        password: first(
+          required(password, "Password"),
+          minLength(password, 8, "Password"),
+        ),
+        confirm: first(
+          required(confirm, "Confirm password"),
+          match(password, confirm),
+        ),
+      };
+      setErrors(nextErrors);
+      if (hasErrors(nextErrors)) return;
 
-      const res = await registerSeller({ name, email, password });
+      const res = await registerSeller({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+      });
       setPendingAuth({
-        email,
+        email: email.trim(),
         purpose: "register",
         next: "/dashboard",
         dev_code: res.dev_code,
@@ -70,7 +98,7 @@ export default function SignupSellerPage() {
 
       <DashedLine />
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-5 px-6 py-6">
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5 px-6 py-6">
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs font-medium text-muted-foreground">
             Data source
@@ -87,7 +115,10 @@ export default function SignupSellerPage() {
               autoComplete="name"
               placeholder="Ada Obi"
               required
+              aria-invalid={errors.name ? true : undefined}
+              onChange={() => clearError("name")}
             />
+            <FieldError>{errors.name}</FieldError>
           </Field>
           <Field>
             <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -98,7 +129,10 @@ export default function SignupSellerPage() {
               autoComplete="email"
               placeholder="ada@example.com"
               required
+              aria-invalid={errors.email ? true : undefined}
+              onChange={() => clearError("email")}
             />
+            <FieldError>{errors.email}</FieldError>
           </Field>
           <Field>
             <FieldLabel htmlFor="password">Password</FieldLabel>
@@ -109,7 +143,10 @@ export default function SignupSellerPage() {
               placeholder="At least 8 characters"
               minLength={8}
               required
+              aria-invalid={errors.password ? true : undefined}
+              onChange={() => clearError("password")}
             />
+            <FieldError>{errors.password}</FieldError>
           </Field>
           <Field>
             <FieldLabel htmlFor="confirm">Confirm password</FieldLabel>
@@ -120,7 +157,10 @@ export default function SignupSellerPage() {
               placeholder="Repeat your password"
               minLength={8}
               required
+              aria-invalid={errors.confirm ? true : undefined}
+              onChange={() => clearError("confirm")}
             />
+            <FieldError>{errors.confirm}</FieldError>
           </Field>
         </FieldGroup>
 
