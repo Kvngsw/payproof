@@ -355,3 +355,93 @@ export function ensureProductsForSeller(seller: any) {
     })),
   );
 }
+
+type SeedInvoice = {
+  id: string;
+  product_kobo: number;
+  total_kobo: number;
+  customer: { name: string; contact: string };
+  note: string;
+  status: "pending" | "cancelled";
+  created_at: string;
+  items: {
+    product_name: string;
+    image_url: string;
+    quantity: number;
+    unit_price_kobo: number;
+  }[];
+};
+
+const SEED_INVOICES: SeedInvoice[] = [
+  {
+    id: "INV-89D517",
+    product_kobo: 5400000,
+    total_kobo: 5400000,
+    customer: { name: "Samina Mina", contact: "" },
+    note: "",
+    status: "cancelled",
+    created_at: new Date(Date.now() - 3 * 86400_000).toISOString(),
+    items: [
+      {
+        product_name: "Suede Chukka Boots",
+        image_url: "",
+        quantity: 1,
+        unit_price_kobo: 5400000,
+      },
+    ],
+  },
+  {
+    id: "INV-C5B0E1",
+    product_kobo: 280000,
+    total_kobo: 280000,
+    customer: { name: "Raheem Orekoya", contact: "" },
+    note: "",
+    status: "pending",
+    created_at: new Date(Date.now() - 86400_000).toISOString(),
+    items: [
+      {
+        product_name: "Canvas Slip-Ons",
+        image_url: "",
+        quantity: 2,
+        unit_price_kobo: 140000,
+      },
+    ],
+  },
+];
+
+export function ensureInvoicesForSeller(seller: any) {
+  if (!seller.seeded_demo) return;
+  if (db.invoices.findBySeller(seller.id).length > 0) return;
+
+  ensureProductsForSeller(seller);
+  const products = db.products.findBySeller(seller.id);
+  const productIdByName = new Map(
+    products.map((p: { id: string; name: string }) => [p.name, p.id]),
+  );
+
+  db.invoices.insertMany(
+    SEED_INVOICES.map((invoice) => ({
+      ...invoice,
+      seller_id: seller.id,
+      order_id: null,
+      paid_at: null,
+      items: invoice.items.map((item) => ({
+        product_id:
+          productIdByName.get(item.product_name) ?? generateId(),
+        name: item.product_name,
+        image_url: item.image_url,
+        quantity: item.quantity,
+        unit_price_kobo: item.unit_price_kobo,
+      })),
+    })),
+  );
+}
+
+export function ensureDemoData() {
+  ensureDemoSellers();
+  const seller = db.sellers.findByEmail(DEMO_SEEDED_EMAIL);
+  if (!seller) return;
+  ensureOrdersForSeller(seller);
+  ensureProductsForSeller(seller);
+  ensureInvoicesForSeller(seller);
+}

@@ -6,24 +6,19 @@ import { DatabaseSync } from "node:sqlite";
 
 const DATA_DIR = path.join(process.cwd(), "mock-data");
 
-const COLLECTIONS = [
-  "sellers",
-  "buyers",
-  "otp_codes",
-  "orders",
-  "products",
-  "invoices",
-] as const;
-export type CollectionName = (typeof COLLECTIONS)[number];
-
-export function collectionFile(name: CollectionName) {
-  return path.join(DATA_DIR, `${name}.json`);
-}
+export type CollectionName =
+  | "sellers"
+  | "buyers"
+  | "otp_codes"
+  | "orders"
+  | "products"
+  | "invoices";
 
 // ---------------------------------------------------------------------------
 // Storage: SQLite (node:sqlite, built-in). Rows live as JSON documents so the
-// repository below keeps its exact in-memory filtering semantics. Falls back
-// to /tmp when the project directory is read-only (deployed/serverless).
+// repository below keeps its exact in-memory filtering semantics. Demo data is
+// seeded in code by lib/mock/seed.ts — there is no JSON file import. Falls
+// back to /tmp when the project directory is read-only (deployed/serverless).
 // ---------------------------------------------------------------------------
 
 let sql: DatabaseSync | null = null;
@@ -51,37 +46,9 @@ function getSql(): DatabaseSync {
       data TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_mock_rows_collection ON mock_rows(collection);
-    CREATE TABLE IF NOT EXISTS mock_meta (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
   `);
   sql = db;
-  importLegacyJsonOnce(db);
   return db;
-}
-
-function importLegacyJsonOnce(db: DatabaseSync) {
-  const marker = db.prepare("SELECT value FROM mock_meta WHERE key = ?").get("json_imported");
-  if (marker) return;
-  for (const name of COLLECTIONS) {
-    let rows: any[] = [];
-    try {
-      const file = collectionFile(name);
-      if (fs.existsSync(file)) {
-        const parsed = JSON.parse(fs.readFileSync(file, "utf-8"));
-        if (Array.isArray(parsed)) rows = parsed;
-      }
-    } catch {}
-    if (rows.length > 0) {
-      const ins = db.prepare("INSERT INTO mock_rows (collection, data) VALUES (?, ?)");
-      for (const row of rows) ins.run(name, JSON.stringify(row));
-    }
-  }
-  db.prepare("INSERT OR REPLACE INTO mock_meta (key, value) VALUES (?, ?)").run(
-    "json_imported",
-    "1",
-  );
 }
 
 export function readCollection(name: CollectionName): any[] {
@@ -107,10 +74,6 @@ export function writeCollection(name: CollectionName, rows: any[]) {
     db.exec("ROLLBACK");
     throw err;
   }
-}
-
-export function ensureCollectionFiles() {
-  getSql();
 }
 
 export function generateId() {
@@ -233,6 +196,11 @@ export const db = {
     insert: (invoice: any) => {
       const rows = readCollection("invoices");
       rows.push(invoice);
+      writeCollection("invoices", rows);
+    },
+    insertMany: (invoices: any[]) => {
+      const rows = readCollection("invoices");
+      rows.push(...invoices);
       writeCollection("invoices", rows);
     },
     updateById: (invoiceId: string, mutator: (invoice: any) => void) => {

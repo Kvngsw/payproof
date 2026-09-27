@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, verifyPassword } from "@/lib/mock/store";
 import { issueToken } from "@/lib/mock/auth";
+import { ensureDemoData } from "@/lib/mock/seed";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
       );
     }
 
+    ensureDemoData();
     const seller = db.sellers.findByEmail(email);
 
     if (!seller || !verifyPassword(password, seller.password_hash)) {

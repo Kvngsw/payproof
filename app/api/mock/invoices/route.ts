@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { verifyToken } from "@/lib/mock/auth";
 import { db, generateInvoiceCode } from "@/lib/mock/store";
+import { ensureInvoicesForSeller } from "@/lib/mock/seed";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
     );
   }
 
+  ensureInvoicesForSeller(seller);
   const invoices = db.invoices
     .findBySeller(seller.id)
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));

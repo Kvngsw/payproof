@@ -1,19 +1,7 @@
-import { ensureCollectionFiles, db, readCollection } from "../lib/mock/store";
-import {
-  ensureDemoSellers,
-  ensureOrdersForSeller,
-  ensureProductsForSeller,
-  DEMO_SEEDED_EMAIL,
-} from "../lib/mock/seed";
+import { readCollection } from "../lib/mock/store";
+import { ensureDemoData, DEMO_SEEDED_EMAIL } from "../lib/mock/seed";
 
-ensureCollectionFiles();
-ensureDemoSellers();
-
-const demo = db.sellers.findByEmail(DEMO_SEEDED_EMAIL);
-if (demo) {
-  ensureOrdersForSeller(demo);
-  ensureProductsForSeller(demo);
-}
+ensureDemoData();
 
 const names = [
   "sellers",
@@ -28,5 +16,5 @@ for (const name of names) {
   console.log(`  ${name}: ${readCollection(name).length} rows`);
 }
 console.log(
-  `  demo seller: ${DEMO_SEEDED_EMAIL} / demo1234 (orders seeded on first run only)`,
+  `  demo seller: ${DEMO_SEEDED_EMAIL} / demo1234 (orders/products/invoices seeded in code)`,
 );
