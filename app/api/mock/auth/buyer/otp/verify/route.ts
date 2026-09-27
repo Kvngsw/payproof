@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, generateId } from "@/lib/mock/store";
 import { issueToken } from "@/lib/mock/auth";
+import { ensureDemoData } from "@/lib/mock/seed";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
     }
 
     db.otps.markUsed(otpRecord.id, new Date().toISOString());
+
+    ensureDemoData(); // buyer sessions can be the first on a fresh store
 
     let buyer = db.buyers.findByEmail(email);
     if (!buyer) {

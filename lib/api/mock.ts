@@ -177,6 +177,65 @@ export async function updateTracking(
   });
 }
 
+export type OrderPayout = {
+  status: string;
+  product_kobo: number;
+  dispatch_kobo: number;
+  transfers: unknown[];
+};
+
+export type AssistantReply = {
+  answer: string;
+  order_status: string;
+  scope: string;
+};
+
+export async function cancelOrder(id: string): Promise<MockOrder> {
+  await authFetch(`/orders/${encodeURIComponent(id)}/cancel`, {
+    method: "POST",
+  });
+  return getOrder(id);
+}
+
+export async function verifyPayment(id: string): Promise<MockOrder> {
+  await authFetch(`/orders/${encodeURIComponent(id)}/verify`, {
+    method: "POST",
+  });
+  return getOrder(id);
+}
+
+export async function confirmDelivery(id: string): Promise<MockOrder> {
+  await authFetch(`/orders/${encodeURIComponent(id)}/confirm-delivery`, {
+    method: "POST",
+  });
+  return getOrder(id);
+}
+
+export async function reportIssue(
+  id: string,
+  reason: string,
+): Promise<MockOrder> {
+  await authFetch(`/orders/${encodeURIComponent(id)}/report-issue`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+  return getOrder(id);
+}
+
+export async function getPayout(id: string): Promise<OrderPayout> {
+  return authFetch(`/orders/${encodeURIComponent(id)}/payout`);
+}
+
+export async function askAssistant(
+  id: string,
+  message: string,
+): Promise<AssistantReply> {
+  return authFetch(`/orders/${encodeURIComponent(id)}/assistant`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
+}
+
 export type MockProduct = {
   id: string;
   name: string;

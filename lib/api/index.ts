@@ -19,6 +19,8 @@ export type {
   MockProduct,
   MockInvoiceItem,
   MockInvoice,
+  OrderPayout,
+  AssistantReply,
 } from "./mock";
 
 const isLive = () => getDataSource() === "live";
@@ -71,6 +73,32 @@ export function updateTracking(
   return isLive()
     ? live.updateTracking(id, payload)
     : mock.updateTracking(id, payload);
+}
+
+export function cancelOrder(id: string) {
+  return isLive() ? live.cancelOrder(id) : mock.cancelOrder(id);
+}
+
+export function verifyPayment(id: string) {
+  return isLive() ? live.verifyPayment(id) : mock.verifyPayment(id);
+}
+
+export function confirmDelivery(id: string) {
+  return isLive() ? live.confirmDelivery(id) : mock.confirmDelivery(id);
+}
+
+export function reportIssue(id: string, reason: string) {
+  return isLive() ? live.reportIssue(id, reason) : mock.reportIssue(id, reason);
+}
+
+export function getPayout(id: string) {
+  return isLive() ? live.getPayout(id) : mock.getPayout(id);
+}
+
+export function askAssistant(id: string, message: string) {
+  return isLive()
+    ? live.askAssistant(id, message)
+    : mock.askAssistant(id, message);
 }
 
 export function listProducts() {

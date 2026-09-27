@@ -1,10 +1,12 @@
 import {
   getToken,
   setToken,
+  type AssistantReply,
   type CountsByStatus,
   type MockInvoice,
   type MockOrder,
   type MockProduct,
+  type OrderPayout,
   type SellerDashboard,
 } from "./mock";
 
@@ -245,7 +247,18 @@ export async function getMe() {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await handleResponse(res);
-  if (data.role !== "seller") return data;
+  if (data.role !== "seller") {
+    const profile = data.profile ?? {};
+    return {
+      role: data.role,
+      profile: {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        created_at: profile.created_at ?? profile.createdAt,
+      },
+    };
+  }
 
   const profile = data.profile ?? {};
   const reserved = profile.reserved_account;
@@ -318,6 +331,52 @@ export async function updateTracking(
     body: JSON.stringify(payload),
   });
   return getOrder(id); // W3
+}
+
+export async function cancelOrder(id: string): Promise<MockOrder> {
+  await authFetch(`/orders/${encodeURIComponent(id)}/cancel`, {
+    method: "POST",
+  });
+  return getOrder(id); // mutation returns {id,status} — refetch (W3)
+}
+
+export async function verifyPayment(id: string): Promise<MockOrder> {
+  await authFetch(`/orders/${encodeURIComponent(id)}/verify`, {
+    method: "POST",
+  });
+  return getOrder(id); // W3
+}
+
+export async function confirmDelivery(id: string): Promise<MockOrder> {
+  await authFetch(`/orders/${encodeURIComponent(id)}/confirm-delivery`, {
+    method: "POST",
+  });
+  return getOrder(id); // W3
+}
+
+export async function reportIssue(
+  id: string,
+  reason: string,
+): Promise<MockOrder> {
+  await authFetch(`/orders/${encodeURIComponent(id)}/report-issue`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+  return getOrder(id); // W3
+}
+
+export async function getPayout(id: string): Promise<OrderPayout> {
+  return authFetch(`/orders/${encodeURIComponent(id)}/payout`);
+}
+
+export async function askAssistant(
+  id: string,
+  message: string,
+): Promise<AssistantReply> {
+  return authFetch(`/orders/${encodeURIComponent(id)}/assistant`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
 }
 
 // ---------------------------------------------------------------------------
