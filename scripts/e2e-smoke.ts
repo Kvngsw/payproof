@@ -68,7 +68,10 @@ async function main() {
   }
 
   const email = `e2e${TS}@payproof.ng`;
-  const reg = await req('POST', '/auth/seller/register', {
+  let sellerToken = '';
+  let sellerId = '';
+  let setCookie = '';
+  const regBody = {
     name: 'E2E Seller',
     email,
     password: 'E2EPass123!',
@@ -76,26 +79,35 @@ async function main() {
     businessName: 'E2E Store',
     bvn: '33333333333',
     settlement: { bankCode: '058', accountNumber: '0123456789' },
-  });
+  };
 
-  let sellerToken = '';
-  let sellerId = '';
-  let setCookie = '';
-  if (reg.status === 201) {
-    check('E01 register 201', true);
-    sellerToken = J(reg).token as string;
-    sellerId = (J(reg).seller as { id: string }).id;
-    setCookie = reg.headers.get('set-cookie') ?? '';
-    check('E01 refresh cookie set', setCookie.includes('pp_refresh') && setCookie.includes('HttpOnly'));
-  } else {
-    console.log(`info E01 live-BVN rejected (${reg.status}) — falling back to seed seller`);
-    const login = await req('POST', '/auth/seller/login', { email: 'ada@payproof.ng', password: 'SeedPassword123!' });
-    check('E02 seed login 200', login.status === 200, JSON.stringify(J(login)).slice(0, 120));
-    sellerToken = J(login).token as string;
-    setCookie = login.headers.get('set-cookie') ?? '';
-    const me0 = await req('GET', '/auth/me', undefined, sellerToken);
-    sellerId = ((J(me0).profile as { id: string } | undefined)?.id ?? '');
-  }
+  // A4 flip: single-step register answers 202 {sent} + OTP email — never a token.
+  const reg = await req('POST', '/auth/seller/register', {
+    name: 'E2E Seller',
+    email,
+    password: 'E2EPass123!',
+  });
+  check('E01 A4 register 202, no token', reg.status === 202 && J(reg).sent === true && J(reg).token === undefined, `got ${reg.status}`);
+  if (reg.status !== 202) console.log(`info E01 response: ${JSON.stringify(J(reg)).slice(0, 120)}`);
+
+  const dupSeller = await req('POST', '/auth/seller/register', { ...regBody, email: 'ada@payproof.ng' });
+  check('E01 duplicate seller email 409', dupSeller.status === 409, `got ${dupSeller.status}`);
+  const dupBuyer = await req('POST', '/auth/buyer/register', { name: 'Dup Buyer', email: 'ada@payproof.ng', password: 'E2EPass123!' });
+  check('A3 seller-email buyer register 409', dupBuyer.status === 409, `got ${dupBuyer.status}`);
+
+  // e2e cannot read OTP mailboxes — the seed seller provides the token.
+  const login = await req('POST', '/auth/seller/login', { email: 'ada@payproof.ng', password: 'SeedPassword123!' });
+  check('E02 seed login 200', login.status === 200, JSON.stringify(J(login)).slice(0, 120));
+  sellerToken = J(login).token as string;
+  setCookie = login.headers.get('set-cookie') ?? '';
+  check('E01 refresh cookie set', setCookie.includes('pp_refresh') && setCookie.includes('HttpOnly'));
+  const me0 = await req('GET', '/auth/me', undefined, sellerToken);
+  sellerId = ((J(me0).profile as { id: string } | undefined)?.id ?? '');
+
+  const loginBad = await req('POST', '/auth/login', { email: 'ada@payproof.ng', password: 'wrong-pass-1' });
+  check('A1 wrong password 401', loginBad.status === 401, `got ${loginBad.status}`);
+  const loginNoBody = await req('POST', '/auth/login', {});
+  check('A1 empty body 400', loginNoBody.status === 400);
 
   const badLogin = await req('POST', '/auth/seller/login', { email, password: 'wrong-pass-1' });
   check('E02 wrong password 401', badLogin.status === 401);
@@ -107,6 +119,20 @@ async function main() {
   check('E05 me leaks no secrets', JSON.stringify(J(me)).includes('passwordHash') === false);
   const meAnon = await req('GET', '/auth/me');
   check('E05 me anon 401', meAnon.status === 401);
+
+  const origBusiness = (J(me).profile as { businessName?: string; name?: string } | undefined)?.businessName ?? '';
+  const patchMe = await req('PATCH', '/auth/me', { business_name: 'E2E Updated Store', phone: '+2348000000002' }, sellerToken);
+  check('A7 PATCH me 200', patchMe.status === 200 && J(patchMe).role === 'seller', `got ${patchMe.status}`);
+  check('A7 response leaks no secrets', JSON.stringify(J(patchMe)).includes('passwordHash') === false);
+  const patchMeBiz = await req('GET', '/auth/me', undefined, sellerToken);
+  check('A7 business_name persisted', ((J(patchMeBiz).profile as { businessName?: string } | undefined)?.businessName ?? '') === 'E2E Updated Store');
+  await req('PATCH', '/auth/me', { business_name: origBusiness, phone: '+2348000000001' }, sellerToken); // restore seed
+  const patchAnon = await req('PATCH', '/auth/me', { name: 'x' });
+  check('A7 anon 401', patchAnon.status === 401);
+  const patchEmpty = await req('PATCH', '/auth/me', {}, sellerToken);
+  check('A7 empty body 400', patchEmpty.status === 400);
+  const patchBadBvn = await req('PATCH', '/auth/me', { bvn: '123' }, sellerToken);
+  check('A7 bad bvn 400', patchBadBvn.status === 400);
   const refreshCookie = setCookie.split(';')[0];
   const ref = await req('POST', '/auth/refresh', undefined, undefined, refreshCookie);
   check('refresh rotates 200', ref.status === 200 && typeof J(ref).token === 'string');
@@ -160,9 +186,15 @@ async function main() {
   if (otpReq.status !== 202) console.log(`info E03 response: ${JSON.stringify(J(otpReq)).slice(0, 120)}`);
   const otpWrong = await req('POST', '/auth/buyer/otp/verify', { email: buyerEmail, code: '000000' });
   check('E04 wrong code 400', otpWrong.status === 400);
+  const otpVerifyWrong = await req('POST', '/auth/otp/verify', { email: buyerEmail, code: '000000' });
+  check('A2 wrong code 400', otpVerifyWrong.status === 400, `got ${otpVerifyWrong.status}`);
   await db.buyer.upsert({ where: { email: buyerEmail }, update: {}, create: { email: buyerEmail } });
   const buyer = await db.buyer.findUniqueOrThrow({ where: { email: buyerEmail } });
   const buyerToken = signAccessToken({ sub: buyer.id, role: 'buyer' });
+  const crossTable = await req('POST', '/auth/seller/register', { name: 'Cross', email: buyerEmail, password: 'E2EPass123!' });
+  check('uniqueness buyer-email seller register 409', crossTable.status === 409, `got ${crossTable.status}`);
+  const patchBuyer = await req('PATCH', '/auth/me', { name: 'x' }, buyerToken);
+  check('A7 buyer forbidden 401', patchBuyer.status === 401, `got ${patchBuyer.status}`);
 
   const oos = await req('POST', '/orders', { product_id: zeroId, delivery_address: '14 Allen Avenue, Ikeja, Lagos' }, buyerToken);
   check('E12 out-of-stock 409', oos.status === 409, `got ${oos.status}`);

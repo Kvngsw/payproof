@@ -1,19 +1,13 @@
-import crypto from 'crypto';
-import bcrypt from 'bcrypt';
 import { z }  from 'zod';
 import { NextRequest } from 'next/server';
-import db     from '@/lib/db';
 import { logger }          from '@/lib/logger';
 import { checkRateLimit, clientIp } from '@/lib/rate-limit';
 import { getRequestId }    from '@/lib/auth';
-import { sendOtp }         from '@/lib/email';
+import { issueAndSendOtp } from '@/lib/otp';
 import { handleError, tooManyRequestsResponse } from '@/lib/api-response';
 import { NextResponse }    from 'next/server';
 
 export const dynamic = 'force-dynamic';
-
-const OTP_EXPIRY_MINUTES = 10;
-const OTP_BCRYPT_ROUNDS  = 10; // lower cost: codes die in 10min, UX beats theoretical strength
 
 const BodySchema = z.object({
   email: z.string().trim().email('email must be a valid email address'),
@@ -47,32 +41,21 @@ export async function POST(request: NextRequest) {
       return tooManyRequestsResponse(retryAfterMs);
     }
 
-    const code     = String(crypto.randomInt(100_000, 999_999)); // crypto-secure: Math.random is predictable
-    const codeHash = await bcrypt.hash(code, OTP_BCRYPT_ROUNDS);
-    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60_000);
-
-    await db.buyer.upsert({
-      where:  { email: cleanEmail },
-      update: {},
-      create: { email: cleanEmail },
-    });
-
-    await db.otpCode.create({
-      data: { email: cleanEmail, codeHash, expiresAt },
-    });
-
-    const delivery = await sendOtp(cleanEmail, code);
+    // Auth v2 (A6): just an OTP row keyed by email — role-agnostic resend for
+    // both roles. No buyer auto-create here (that died with A3); the verify
+    // step resolves whichever account owns the email.
+    const { delivery } = await issueAndSendOtp(cleanEmail);
 
     logger.info('OTP requested', {
       email:    cleanEmail,
-      delivery: delivery.delivery,
+      delivery,
       requestId,
     });
 
     return NextResponse.json(
       {
         sent:     true,
-        delivery: delivery.delivery,
+        delivery,
       },
       { status: 202 },
     );

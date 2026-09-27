@@ -71,10 +71,16 @@ export function verifyPassword(password: string, hash: string) {
   return hashPassword(password) === hash;
 }
 
+// Auth v2: emails are case-insensitive — compare lowercased so lookups still
+// match rows stored before normalization existed.
+function sameEmail(a: string, b: string) {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
 export const db = {
   sellers: {
     findByEmail: (email: string) => {
-      return readCollection("sellers").find((s) => s.email === email);
+      return readCollection("sellers").find((s) => sameEmail(s.email, email));
     },
     findById: (id: string) => {
       return readCollection("sellers").find((s) => s.id === id);
@@ -95,7 +101,7 @@ export const db = {
   },
   buyers: {
     findByEmail: (email: string) => {
-      return readCollection("buyers").find((b) => b.email === email);
+      return readCollection("buyers").find((b) => sameEmail(b.email, email));
     },
     findById: (id: string) => {
       return readCollection("buyers").find((b) => b.id === id);
@@ -202,7 +208,7 @@ export const db = {
   otps: {
     findLatestByEmail: (email: string) => {
       const records = readCollection("otp_codes").filter(
-        (o) => o.email === email && !o.used_at,
+        (o) => sameEmail(o.email, email) && !o.used_at,
       );
       if (records.length === 0) return null;
       return records.sort((a, b) => b.expires_at - a.expires_at)[0];

@@ -22,10 +22,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const existing = db.sellers.findByEmail(email);
-    if (existing) {
+    const cleanEmail = String(email).trim().toLowerCase();
+
+    const duplicate = "An account with this email already exists. Please log in.";
+    if (db.sellers.findByEmail(cleanEmail)) {
       return NextResponse.json(
-        { error: { code: "DUPLICATE", message: "Email already registered" } },
+        { error: { code: "DUPLICATE", message: duplicate } },
+        { status: 409 }
+      );
+    }
+    if (db.buyers.findByEmail(cleanEmail)) {
+      return NextResponse.json(
+        { error: { code: "DUPLICATE", message: duplicate } },
         { status: 409 }
       );
     }
@@ -41,7 +49,7 @@ export async function POST(request: Request) {
 
     const seller = {
       id,
-      email,
+      email: cleanEmail,
       password_hash,
       name,
       phone: String(phone ?? "").trim(),
@@ -55,7 +63,7 @@ export async function POST(request: Request) {
     db.sellers.insert(seller);
 
     // Auth v2: no token at register — OTP verification at /otp signs them in.
-    const dev_code = issueOtp(email);
+    const dev_code = issueOtp(cleanEmail);
 
     return NextResponse.json(
       { sent: true, delivery: "dev_screen", dev_code },

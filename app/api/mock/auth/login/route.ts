@@ -17,8 +17,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const seller = db.sellers.findByEmail(email);
-    const buyer = db.buyers.findByEmail(email);
+    const cleanEmail = String(email).trim().toLowerCase();
+
+    const seller = db.sellers.findByEmail(cleanEmail);
+    const buyer = db.buyers.findByEmail(cleanEmail);
 
     const sellerOk =
       seller?.password_hash && verifyPassword(password, seller.password_hash);
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     const role = sellerOk ? "seller" : "buyer";
-    const dev_code = issueOtp(email);
+    const dev_code = issueOtp(cleanEmail);
 
     return NextResponse.json(
       { sent: true, role, delivery: "dev_screen", dev_code },

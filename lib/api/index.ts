@@ -65,7 +65,7 @@ export function getMe() {
 }
 
 export function updateProfile(payload: Parameters<typeof mock.updateProfile>[0]) {
-  return isLive() ? live.updateProfile() : mock.updateProfile(payload);
+  return isLive() ? live.updateProfile(payload) : mock.updateProfile(payload);
 }
 
 export function getSellerDashboard() {

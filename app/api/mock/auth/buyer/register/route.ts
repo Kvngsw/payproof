@@ -30,14 +30,16 @@ export async function POST(request: Request) {
       );
     }
 
-    if (db.sellers.findByEmail(email)) {
+    const cleanEmail = String(email).trim().toLowerCase();
+
+    if (db.sellers.findByEmail(cleanEmail)) {
       return NextResponse.json(
         { error: { code: "DUPLICATE", message: "Email already registered — sign in instead" } },
         { status: 409 }
       );
     }
 
-    const existing = db.buyers.findByEmail(email);
+    const existing = db.buyers.findByEmail(cleanEmail);
     if (existing?.password_hash) {
       return NextResponse.json(
         { error: { code: "DUPLICATE", message: "Email already registered — sign in instead" } },
@@ -52,13 +54,13 @@ export async function POST(request: Request) {
       db.buyers.insert({
         id: generateId(),
         name,
-        email,
+        email: cleanEmail,
         password_hash: hashPassword(password),
         created_at: new Date().toISOString(),
       });
     }
 
-    const dev_code = issueOtp(email);
+    const dev_code = issueOtp(cleanEmail);
 
     return NextResponse.json(
       { sent: true, delivery: "dev_screen", dev_code },

@@ -84,14 +84,18 @@ export function DashboardNavbar() {
 
           <div className="hidden items-center gap-3 sm:flex">
             <DataSourceToggle reload />
-            <div className="flex items-center gap-2.5">
+            <Link
+              href="/dashboard/profile"
+              className="flex min-h-10 items-center gap-2.5 rounded-full px-1 transition-colors hover:bg-muted"
+              title="Profile"
+            >
               <span className="grid size-8 place-items-center rounded-full border border-border/60 bg-muted text-xs font-semibold">
                 {initialsOf(profile?.name, profile?.business_name)}
               </span>
               <span className="max-w-40 truncate text-sm font-medium">
                 {displayName}
               </span>
-            </div>
+            </Link>
             <button
               type="button"
               onClick={signOut}
@@ -175,14 +179,19 @@ export function DashboardNavbar() {
             style={{ transitionDelay: "100ms" }}
           >
             <DataSourceToggle reload />
-            <div className="flex items-center gap-2.5">
+            <Link
+              href="/dashboard/profile"
+              onClick={() => setMenuOpen(false)}
+              className="flex min-h-10 items-center gap-2.5 rounded-full px-1 transition-colors hover:bg-muted"
+              title="Profile"
+            >
               <span className="grid size-8 place-items-center rounded-full border border-border/60 bg-muted text-xs font-semibold">
                 {initialsOf(profile?.name, profile?.business_name)}
               </span>
               <span className="max-w-60 truncate text-sm font-medium">
                 {displayName}
               </span>
-            </div>
+            </Link>
             <button
               type="button"
               onClick={signOut}

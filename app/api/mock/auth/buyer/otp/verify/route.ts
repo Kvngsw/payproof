@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db, generateId } from "@/lib/mock/store";
+import { db } from "@/lib/mock/store";
 import { issueToken } from "@/lib/mock/auth";
 import { isReadOnly } from "@/lib/mock/read-only";
 import { READ_ONLY_OTP_CODE } from "@/lib/mock/otp";
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       db.otps.markUsed(otpRecord.id, new Date().toISOString());
     }
 
-    let buyer = db.buyers.findByEmail(email);
+    const buyer = db.buyers.findByEmail(email);
     if (!buyer) {
       if (isReadOnly()) {
         return NextResponse.json(
@@ -75,10 +75,16 @@ export async function POST(request: Request) {
           { status: 403 },
         );
       }
-      const buyerId = generateId();
-      const created_at = new Date().toISOString();
-      buyer = { id: buyerId, email, created_at };
-      db.buyers.insert(buyer);
+      // Auth v2 (A3): OTP no longer auto-creates buyer accounts.
+      return NextResponse.json(
+        {
+          error: {
+            code: "VALIDATION",
+            message: "No account found for this email. Please sign up first.",
+          },
+        },
+        { status: 400 }
+      );
     }
 
     const token = issueToken({ sub: buyer.id, role: "buyer", name: email.split("@")[0], email });

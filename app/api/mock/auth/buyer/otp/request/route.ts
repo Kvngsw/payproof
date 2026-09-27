@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const code = issueOtp(email);
+    const code = issueOtp(String(email).trim().toLowerCase());
 
     return NextResponse.json(
       {

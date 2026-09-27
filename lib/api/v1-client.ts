@@ -7,6 +7,8 @@ import {
   type MockOrder,
   type MockProduct,
   type OrderPayout,
+  type ProfilePatch,
+  type ProfileResponse,
   type SellerDashboard,
 } from "./mock";
 
@@ -541,12 +543,42 @@ export async function payInvoice(): Promise<{ order_id: string }> {
 }
 
 // ---------------------------------------------------------------------------
-// Profile update: not implemented on the backend yet (docs/api-requests.md §1.4 A7)
+// Profile update (docs/api-requests.md §1.4 A7)
 // ---------------------------------------------------------------------------
 
-const PROFILE_LIVE_HINT =
-  "Profile editing runs on demo data for now — switch the data source to Demo data.";
-
-export async function updateProfile(): Promise<never> {
-  throw new Error(PROFILE_LIVE_HINT);
+export async function updateProfile(
+  payload: ProfilePatch,
+): Promise<ProfileResponse> {
+  const token = getToken();
+  if (!token) throw new Error("Not authenticated");
+  const res = await fetch(`${AUTH}/me`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await handleResponse(res);
+  const profile = data.profile ?? {};
+  const reserved = data.reserved_account ?? profile.reserved_account;
+  return {
+    role: data.role,
+    profile: {
+      id: profile.id,
+      name: profile.name,
+      email: profile.email,
+      phone: profile.phone,
+      business_name: profile.business_name ?? profile.businessName,
+      settlement: profile.settlement ?? null,
+      reserved_account_number: reserved?.account_number,
+      reserved_bank: reserved?.bank_name,
+      reserved_account_name: reserved?.account_name,
+    },
+    reserved_account: {
+      account_number: reserved?.account_number ?? "",
+      bank_name: reserved?.bank_name ?? "",
+      account_name: reserved?.account_name ?? "",
+    },
+  };
 }

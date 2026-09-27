@@ -5,7 +5,7 @@ import db     from '@/lib/db';
 import { logger }           from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { signAccessToken, signRefreshToken, refreshCookieHeader, getRequestId } from '@/lib/auth';
-import { ok, badRequest, handleError, tooManyRequestsResponse, conflict } from '@/lib/api-response';
+import { ok, badRequest, handleError, tooManyRequestsResponse } from '@/lib/api-response';
 import { OtpExpiredError, OtpMaxAttemptsError } from '@/lib/errors';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +17,9 @@ const BodySchema = z.object({
   code:  z.string().length(6, 'code must be exactly 6 digits').regex(/^\d+$/, 'code must be numeric'),
 });
 
+// Auth v2 (A2): role-agnostic verify — issues a token for whichever account
+// owns the email (seller checked first). Existing OTP rules kept: 10-min
+// expiry, ≤5 attempts counted before compare, rate limited per email.
 export async function POST(request: NextRequest) {
   const requestId = getRequestId(request);
 
@@ -81,40 +84,26 @@ export async function POST(request: NextRequest) {
       data:  { usedAt: new Date() },
     });
 
-    // Uniqueness guard: a seller owning this email can't be upserted into a
-    // buyer row — real seller login goes through /auth/login (A1).
-    const sellerExists = await db.seller.findUnique({
-      where:  { email: cleanEmail },
-      select: { id: true },
-    });
-    if (sellerExists) {
-      logger.warn('Legacy buyer verify blocked — email belongs to a seller', {
-        email: cleanEmail,
-        requestId,
-      });
-      return conflict('An account with this email already exists. Please log in.');
+    const seller = await db.seller.findUnique({ where: { email: cleanEmail } });
+    if (seller) {
+      const payload = { sub: seller.id, role: 'seller' as const, name: seller.name };
+      const response = ok({ token: signAccessToken(payload), role: 'seller' });
+      response.headers.set('Set-Cookie', refreshCookieHeader(signRefreshToken(payload)));
+      logger.info('Auth v2 OTP verified — seller session issued', { sellerId: seller.id, requestId });
+      return response;
     }
 
-    const buyer = await db.buyer.upsert({
-      where:  { email: cleanEmail },
-      update: {},
-      create: { email: cleanEmail },
-    });
+    const buyer = await db.buyer.findUnique({ where: { email: cleanEmail } });
+    if (buyer) {
+      const payload = { sub: buyer.id, role: 'buyer' as const, name: buyer.name ?? undefined };
+      const response = ok({ token: signAccessToken(payload), role: 'buyer' });
+      response.headers.set('Set-Cookie', refreshCookieHeader(signRefreshToken(payload)));
+      logger.info('Auth v2 OTP verified — buyer session issued', { buyerId: buyer.id, requestId });
+      return response;
+    }
 
-    const payload = { sub: buyer.id, role: 'buyer' as const };
-    const access  = signAccessToken(payload);
-    const refresh = signRefreshToken(payload);
-
-    logger.info('Buyer OTP verified — logged in', { buyerId: buyer.id, requestId });
-
-    const response = ok({
-      token: access,
-      buyer: { id: buyer.id, email: buyer.email },
-    });
-
-    response.headers.set('Set-Cookie', refreshCookieHeader(refresh));
-    return response;
+    return badRequest('No account found for this email. Please sign up first.', 'VALIDATION');
   } catch (err) {
-    return handleError(err, 'POST /api/v1/auth/buyer/otp/verify', requestId);
+    return handleError(err, 'POST /api/v1/auth/otp/verify', requestId);
   }
 }

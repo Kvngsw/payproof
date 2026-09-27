@@ -73,12 +73,13 @@ model Seller {
 // ── Buyers ───────────────────────────────────────────────────────────────────
 
 model Buyer {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  createdAt DateTime @default(now())
+  id           String  @id @default(uuid())
+  name         String?
+  email        String  @unique
+  passwordHash String? // Auth v2 (A5): buyers register with a password now
+  createdAt    DateTime @default(now())
 
   orders    Order[]
-  otpCodes  OtpCode[]
 
   @@map("buyers")
 }
@@ -94,8 +95,8 @@ model OtpCode {
   attempts  Int       @default(0)
   createdAt DateTime  @default(now())
 
-  buyer     Buyer?    @relation(fields: [email], references: [email])
-
+  // No relation to Buyer: OTP is keyed by email alone so Auth v2 can send
+  // codes to seller emails too (dropped the old OtpCode_email_fkey).
   @@index([email])
   @@index([expiresAt])
   @@map("otp_codes")
