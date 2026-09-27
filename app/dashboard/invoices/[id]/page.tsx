@@ -12,6 +12,8 @@ import {
   type MockInvoice,
 } from "@/lib/api/mock";
 import { useDashboardSession } from "@/components/dashboard/session-context";
+import { useDataSource } from "@/lib/api";
+import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
 import { InvoiceBarcode } from "@/components/dashboard/invoice-barcode";
 import { InvoiceStatusChip } from "@/components/dashboard/invoice-status-chip";
@@ -69,6 +71,7 @@ function Row({
 export default function InvoiceDetailPage() {
   const params = useParams<{ id: string }>();
   const session = useDashboardSession();
+  const source = useDataSource();
   const [invoice, setInvoice] = useState<MockInvoice | null>(null);
   const [failed, setFailed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -125,6 +128,14 @@ export default function InvoiceDetailPage() {
           <div className="h-64 rounded-xl border border-border/60 bg-muted/40" />
           <div className="h-64 rounded-xl border border-border/60 bg-muted/40" />
         </div>
+      </div>
+    );
+  }
+
+  if (source === "live") {
+    return (
+      <div className="space-y-6">
+        <DemoDataNotice />
       </div>
     );
   }

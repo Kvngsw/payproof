@@ -7,10 +7,12 @@ import { IconShieldCheck } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { PasswordInput } from "@/components/auth/password-input";
 import { DashedLine } from "@/components/auth/dashed-line";
+import { DataSourceToggle } from "@/components/dashboard/data-source-switch";
 import { cn } from "@/lib/utils";
-import { loginSeller, requestOtp, verifyOtp } from "@/lib/api/mock";
+import { loginSeller, requestOtp, verifyOtp } from "@/lib/api";
 import { toast } from "sonner";
 
 type Role = "seller" | "buyer";
@@ -53,6 +55,10 @@ export default function SigninPage() {
             toast.success("OTP sent to your email!");
           }
         } else {
+          if (!/^\d{6}$/.test(otpCode)) {
+            toast.error("Enter the 6-digit code");
+            return;
+          }
           await verifyOtp(buyerEmail, otpCode);
           toast.success("Signed in successfully!");
           router.push("/dashboard");
@@ -111,6 +117,13 @@ export default function SigninPage() {
             ))}
           </div>
 
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-medium text-muted-foreground">
+              Data source
+            </span>
+            <DataSourceToggle />
+          </div>
+
           <FieldGroup>
             {role === "seller" ? (
               <>
@@ -154,15 +167,22 @@ export default function SigninPage() {
             ) : (
               <Field>
                 <FieldLabel htmlFor="code">One-time code</FieldLabel>
-                <Input
+                <InputOTP
                   id="code"
                   name="code"
                   value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
-                  placeholder="Enter 6-digit code"
+                  onChange={setOtpCode}
                   maxLength={6}
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
                   required
-                />
+                >
+                  <InputOTPGroup>
+                    {[0, 1, 2, 3, 4, 5].map((index) => (
+                      <InputOTPSlot key={index} index={index} />
+                    ))}
+                  </InputOTPGroup>
+                </InputOTP>
                 {devCodeBanner && (
                   <div className="mt-2 rounded-xl border border-primary/30 bg-primary/10 p-3 text-xs text-foreground">
                     <span className="font-bold text-primary">DEV MODE:</span> Your OTP code is{" "}

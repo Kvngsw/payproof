@@ -11,6 +11,7 @@ type Feature = {
   body: string;
   cta?: { label: string; href: string };
   visualLabel: string;
+  visualSrc: string;
   audience: Audience;
 };
 
@@ -20,24 +21,28 @@ const FEATURES: Feature[] = [
     body: "Tobi pays once: ₦45,000 for the sneakers and ₦3,500 for the rider. PayProof locks the full ₦48,500 until the box is in his hands. Fake receipts can\u2019t move it. A vanishing seller can\u2019t touch it. When Tobi confirms delivery, Ada gets her price and the rider gets his fee.",
     cta: { label: "Get your reserved account", href: "/register" },
     visualLabel: "Escrow split",
+    visualSrc: "/one-payment-in.svg",
     audience: "both",
   },
   {
     headline: "However they pay. One account.",
     body: "Bank transfer, USSD, card, ATM, or any bank they use. They pay from your link, and the money lands in your one reserved account. No POS to carry, no \u201cwhich bank?\u201d texts, no new account number every sale.",
     visualLabel: "Any payment method",
+    visualSrc: "/however-they-pay.svg",
     audience: "both",
   },
   {
     headline: "Stop asking \u201chave you seen the alert?\u201d",
     body: "Every payment lands in your own reserved account, and it is confirmed to PayProof directly. No screenshots to squint at, no fake debit alerts, no \u201cnetwork delay\u201d stories. Paid means paid.",
     visualLabel: "PAID receipt",
+    visualSrc: "/alert.svg",
     audience: "seller",
   },
   {
     headline: "If the package never lands, the money never moves.",
     body: "One tap on \u201cReport issue\u201d and the order freezes. The payout locks exactly where it is. No quiet withdrawals, no stories. Every state change stays on the record, so both sides are protected.",
     visualLabel: "Disputed timeline",
+    visualSrc: "/the-money-never-moves.svg",
     audience: "buyer",
   },
   {
@@ -45,6 +50,7 @@ const FEATURES: Feature[] = [
     body: "Every completed order builds your score. A real count from real sales, shown on your storefront. No bought reviews, no faked badges. When a stranger lands on Ada\u2019s page, \u201c>90% completed\u201d does the convincing.",
     cta: { label: "Open your storefront", href: "/register" },
     visualLabel: "Storefront + badge",
+    visualSrc: "/new-buyers-trust-you.svg",
     audience: "seller",
   },
 ];
@@ -77,6 +83,7 @@ function FeatureBlock({ feature, flip }: { feature: Feature; flip: boolean }) {
       <div className={cn(flip && "md:order-1")}>
         <VisualPlaceholder
           label={feature.visualLabel}
+          src={feature.visualSrc}
           className="aspect-[4/3] w-full"
         />
       </div>

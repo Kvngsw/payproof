@@ -7,10 +7,12 @@ import { IconShieldCheck } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { PasswordInput } from "@/components/auth/password-input";
 import { DashedLine } from "@/components/auth/dashed-line";
+import { DataSourceToggle } from "@/components/dashboard/data-source-switch";
 import { cn } from "@/lib/utils";
-import { registerSeller, requestOtp, verifyOtp } from "@/lib/api/mock";
+import { registerSeller, requestOtp, verifyOtp, useDataSource } from "@/lib/api";
 import { toast } from "sonner";
 
 type Role = "seller" | "buyer";
@@ -18,6 +20,7 @@ type Role = "seller" | "buyer";
 export default function RegisterPage() {
   const router = useRouter();
   const [role, setRole] = useState<Role>("seller");
+  const source = useDataSource();
   const [loading, setLoading] = useState(false);
 
   // Buyer OTP flow state
@@ -40,7 +43,22 @@ export default function RegisterPage() {
         const phone = formData.get("phone") as string;
         const password = formData.get("password") as string;
 
-        await registerSeller({ name, email, password, phone, business_name });
+        await registerSeller({
+          name,
+          email,
+          password,
+          phone,
+          business_name,
+          ...(source === "live"
+            ? {
+                bvn: (formData.get("bvn") as string) ?? "",
+                settlement: {
+                  bankCode: (formData.get("bank_code") as string) ?? "",
+                  accountNumber: (formData.get("account_number") as string) ?? "",
+                },
+              }
+            : {}),
+        });
         toast.success("Seller account created successfully!");
         router.push("/dashboard");
       } else {
@@ -56,6 +74,10 @@ export default function RegisterPage() {
             toast.success("OTP sent to your email!");
           }
         } else {
+          if (!/^\d{6}$/.test(otpCode)) {
+            toast.error("Enter the 6-digit code");
+            return;
+          }
           await verifyOtp(buyerEmail, otpCode);
           toast.success("Buyer verified successfully!");
           router.push("/dashboard");
@@ -118,6 +140,13 @@ export default function RegisterPage() {
             ))}
           </div>
 
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-medium text-muted-foreground">
+              Data source
+            </span>
+            <DataSourceToggle />
+          </div>
+
           <FieldGroup>
             {role === "seller" ? (
               <>
@@ -163,6 +192,62 @@ export default function RegisterPage() {
                     required
                   />
                 </Field>
+                {source === "live" && (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Payout details
+                      </span>
+                      <span className="h-px flex-1 bg-border/60" />
+                    </div>
+                    <Field>
+                      <FieldLabel htmlFor="bvn">BVN</FieldLabel>
+                      <Input
+                        id="bvn"
+                        name="bvn"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="11-digit bank verification number"
+                        pattern="\d{11}"
+                        maxLength={11}
+                        required
+                      />
+                      <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
+                        Used to create your reserved payout account. Never
+                        shown again after signup.
+                      </p>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="bank_code">
+                        Settlement bank code
+                      </FieldLabel>
+                      <Input
+                        id="bank_code"
+                        name="bank_code"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="e.g. 035"
+                        maxLength={10}
+                        required
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="account_number">
+                        Settlement account number
+                      </FieldLabel>
+                      <Input
+                        id="account_number"
+                        name="account_number"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="10-digit account number"
+                        pattern="\d{10}"
+                        maxLength={10}
+                        required
+                      />
+                    </Field>
+                  </>
+                )}
                 <Field>
                   <FieldLabel htmlFor="password">Password</FieldLabel>
                   <PasswordInput
@@ -194,15 +279,22 @@ export default function RegisterPage() {
             ) : (
               <Field>
                 <FieldLabel htmlFor="code">One-time code</FieldLabel>
-                <Input
+                <InputOTP
                   id="code"
                   name="code"
                   value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
-                  placeholder="Enter 6-digit code"
+                  onChange={setOtpCode}
                   maxLength={6}
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
                   required
-                />
+                >
+                  <InputOTPGroup>
+                    {[0, 1, 2, 3, 4, 5].map((index) => (
+                      <InputOTPSlot key={index} index={index} />
+                    ))}
+                  </InputOTPGroup>
+                </InputOTP>
                 {devCodeBanner && (
                   <div className="mt-2 rounded-xl border border-primary/30 bg-primary/10 p-3 text-xs text-foreground">
                     <span className="font-bold text-primary">DEV MODE:</span> Your OTP code is{" "}

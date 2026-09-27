@@ -14,6 +14,8 @@ import {
   type MockProduct,
 } from "@/lib/api/mock";
 import { useDashboardSession } from "@/components/dashboard/session-context";
+import { useDataSource } from "@/lib/api";
+import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
 import { InvoiceBarcode } from "@/components/dashboard/invoice-barcode";
 import { BlankBar } from "@/components/dashboard/blank-bar";
@@ -36,6 +38,7 @@ const TEXTAREA_CLASS =
 export default function NewInvoicePage() {
   const router = useRouter();
   const session = useDashboardSession();
+  const source = useDataSource();
   const [products, setProducts] = useState<MockProduct[] | null>(null);
   const [selected, setSelected] = useState<Record<string, number>>({});
   const [customerName, setCustomerName] = useState("");
@@ -123,6 +126,14 @@ export default function NewInvoicePage() {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
       setBusy(false);
     }
+  }
+
+  if (source === "live") {
+    return (
+      <div className="space-y-6">
+        <DemoDataNotice />
+      </div>
+    );
   }
 
   return (

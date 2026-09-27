@@ -26,6 +26,8 @@ import {
   type MockInvoice,
 } from "@/lib/api/mock";
 import { useDashboardSession } from "@/components/dashboard/session-context";
+import { useDataSource } from "@/lib/api";
+import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
 import { InvoiceStatusChip } from "@/components/dashboard/invoice-status-chip";
 import { Amount } from "@/components/amount";
@@ -79,6 +81,7 @@ function CopyLinkButton({ id }: { id: string }) {
 export default function InvoicesPage() {
   const router = useRouter();
   const session = useDashboardSession();
+  const source = useDataSource();
   const [invoices, setInvoices] = useState<MockInvoice[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -110,6 +113,19 @@ export default function InvoicesPage() {
   }
 
   const loading = session.status === "loading" || (invoices === null && !failed);
+
+  if (source === "live") {
+    return (
+      <div className="space-y-6">
+        <header>
+          <h1 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl">
+            Invoices
+          </h1>
+        </header>
+        <DemoDataNotice />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
