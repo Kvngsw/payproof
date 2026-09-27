@@ -203,16 +203,16 @@ Legend: ✅ exists & wired · ⚠️ exists with gaps (item id) · ❌ missing �
 | OTP request/verify | ✓ | ✅ (`dev_code` + card banner) | ✅ live sends SMTP email (nodemailer) — `SMTP_*` env required | |
 | `GET /auth/me` | ✓ | ✅ | ⚠️ R5 | |
 | Dashboard | ✓ | ✅ | ⚠️ R6 | |
-| Orders list | ✓ | ✅ | ⚠️ R1 | |
-| Order detail | ✓ | ✅ | ⚠️ R3, R4 | |
+| Orders list | ✓ (seller + buyer) | ✅ (buyer scope added) | ⚠️ R1 | |
+| Order detail | ✓ (seller + buyer) | ✅ (buyer scope added) | ⚠️ R3, R4 | |
 | Ship / tracking | ✓ | ✅ | ⚠️ R2, V6 | |
-| Orders: cancel / confirm-delivery / report-issue / verify / payout / create | — | ✅ (parity pass) | ✅ | buyer UI pending |
+| Orders: cancel / confirm-delivery / report-issue / verify / payout / create | ✓ buyer UI | ✅ (parity pass) | ✅ | buyer actions on order detail (status-gated, polling while active) |
 | Products list | ✓ | ✅ | ⚠️ R7, R8 | |
 | Products create/patch | ✓ | ✅ | ⚠️ V1–V4 | |
 | Products **delete** | ✓ | ✅ | ✅ §1.2 (handler shipped in this repo) | returns `409 PRODUCT_HAS_ORDERS` when referenced |
 | **Invoices** list/create/detail/cancel/public | ✓ | ✅ | ❌ §1.1 | **top priority** |
 | Seller public profile + reputation | — | ✅ (parity pass) | ✅ | storefront page planned |
-| Order assistant | — | ✅ (stub, canned reply) | ✅ | FE UI planned |
+| Order assistant | ✓ buyer UI | ✅ (stub, canned reply) | ✅ | chat panel on buyer order detail |
 | Auth refresh | — | ✅ (parity pass) | ✅ | FE uses cookie flow |
 | Health | — | ✅ (parity pass) | ✅ | |
 | Monnify webhook/simulate | — | — | ✅ | external |

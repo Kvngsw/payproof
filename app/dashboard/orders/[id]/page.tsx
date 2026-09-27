@@ -6,6 +6,8 @@ import { useParams } from "next/navigation";
 import { getOrder, type MockOrder } from "@/lib/api";
 import { useDashboardSession } from "@/components/dashboard/session-context";
 import { OrderActions } from "@/components/dashboard/order-actions";
+import { BuyerOrderActions } from "@/components/dashboard/buyer-order-actions";
+import { OrderAssistant } from "@/components/dashboard/order-assistant";
 import { StatusChip } from "@/components/status-chip";
 import { Amount } from "@/components/amount";
 import {
@@ -136,11 +138,21 @@ function buildTimeline(order: MockOrder): TimelineItemData[] {
   return items;
 }
 
+const POLL_INTERVAL_MS = 5_000;
+const LIVE_STATUSES = new Set([
+  "Pending Payment",
+  "Paid",
+  "Awaiting Shipment",
+  "Shipped",
+  "Delivered",
+]);
+
 export default function OrderDetailPage() {
   const params = useParams<{ id: string }>();
   const session = useDashboardSession();
   const [order, setOrder] = useState<MockOrder | null>(null);
   const [failed, setFailed] = useState(false);
+  const isBuyer = session.status === "authed" && session.data.role === "buyer";
 
   useEffect(() => {
     if (session.status !== "authed") return;
@@ -156,6 +168,19 @@ export default function OrderDetailPage() {
       cancelled = true;
     };
   }, [session.status, params.id]);
+
+  // Buyer view stays fresh while the order is still moving (board FE-11)
+  useEffect(() => {
+    if (!isBuyer || !order || !LIVE_STATUSES.has(order.status)) return;
+    const timer = setInterval(() => {
+      getOrder(params.id)
+        .then((data) => setOrder(data))
+        .catch(() => {
+          /* transient poll failure — next tick retries */
+        });
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [isBuyer, order, params.id]);
 
   const loading = session.status === "loading" || (order === null && !failed);
 
@@ -228,7 +253,11 @@ export default function OrderDetailPage() {
         )}
       </header>
 
-      <OrderActions order={order} onUpdated={setOrder} />
+      {isBuyer ? (
+        <BuyerOrderActions order={order} onUpdated={setOrder} />
+      ) : (
+        <OrderActions order={order} onUpdated={setOrder} />
+      )}
 
       {order.status === "Disputed" && (
         <div className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -254,7 +283,11 @@ export default function OrderDetailPage() {
           <section>
             <SectionHeading>Order details</SectionHeading>
             <dl className="mt-2">
-              <Row label="Buyer">{order.buyer_email ?? "—"}</Row>
+              <Row label={isBuyer ? "Seller" : "Buyer"}>
+                {isBuyer
+                  ? order.seller.business_name || "—"
+                  : (order.buyer_email ?? "—")}
+              </Row>
               <Row label="Delivery address">{order.delivery_address}</Row>
               <Row label="Tracking">
                 {tracked ? (
@@ -364,6 +397,8 @@ export default function OrderDetailPage() {
           </section>
         </div>
       </div>
+
+      {isBuyer && <OrderAssistant orderId={order.id} />}
     </div>
   );
 }
