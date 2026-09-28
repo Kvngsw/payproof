@@ -12,7 +12,7 @@ Escrow-style payment protection for informal/social commerce sellers and buyers,
 |---|---|
 | Web app | `https://payproof-seven.vercel.app` |
 | Repo | `https://github.com/Kvngsw/payproof` (public) |
-| API | `https://payproof-seven.vercel.app`  |
+| API | `https://payproof-seven.vercel.app/api/v1` (same Vercel app as the web frontend) |
 | Demo video (backup) | [NEEDS INPUT — not recorded yet, PM-13] |
 
 ---
@@ -39,7 +39,7 @@ docker compose up      # or: npm install && npm run dev, per apps/api and apps/w
 | `GEMINI_API_KEY` | api | Gemini 3.8 Flash, powers the order-scoped AI assistant |
 | `DEMO_FALLBACK` | api | Currently `false` — cached-webhook fallback (E15) is off. Consider `true` until the public webhook URL is proven working. |
 | `NEXT_PUBLIC_APP_URL` | web | Currently `https://payproof-seven.vercel.app` |
-| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | api | `https://happy-stork-303744.upstash.io` (in-memory only, unsafe on serverless)
+| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | api | Upstash Redis for state shared across serverless instances. |
 
 
 ---
@@ -57,7 +57,7 @@ Seller ─┘        │                    │      │     └─→ Logistics
 ```
 
 - **Frontend:** Next.js, deployed on Vercel.
-- **Backend:** Express/TS API — **[NEEDS INPUT: hosting provider — not yet deployed publicly per env config]**.
+- **Backend:** Next.js API routes — same Vercel deployment as the frontend, not a separate service.
 - **DB:** Postgres on **Supabase** (pooler, eu-central-1) — schema in `docs/api-contract.md` (orders, payments, payouts, order_events, products, sellers, buyers).
 - **Rail:** Monnify sandbox.
 - **AI assistant:** Gemini 2.5 Flash, order-scoped only.
@@ -78,9 +78,9 @@ Be upfront about this on stage — judges find it faster than you'd like.
 |---|---|
 | Seller reserved account | **LIVE** — real Monnify sandbox call|
 | Payment verification | Server-side `verifyTransaction()` call against Monnify, not just trusting the webhook body — **[NEEDS INPUT: confirm this is how Richard built E16]** |
-| Dispatch-fee split | **NOT YET REAL.** Logistics beneficiary details are still placeholders in the env — the second transfer has not been attempted. Do not claim this live until D6 is unblocked. |
+| Dispatch-fee split | **Product-side payout executed in sandbox** (₦9,500 seller transfer). The dispatch-fee transfer to a second recipient is **not yet proven**; until it is, the UI shows the fee as HELD. |
 | Delivery tracking | Manually updated by seller, not pulled from a courier API. Labelled "Manually updated by seller" in the UI. |
-| Reputation score | Computed from real seed data (historical orders inserted as real rows), not hardcoded. |
+| Reputation score | Computed live from order rows: completed ÷ finished orders (completed + cancelled + disputed). In-flight orders are excluded. Demo sellers are seeded with 9 historical orders each (disclosed); new orders change the score. Differs from the spec's "all orders" denominator (decision-log D4). |
 | Fraud flag | Rule-based (deviation from seller's average order value), not ML. Labelled "Rule-based" in the UI. |
 | AI assistant | Order-scoped only; cannot act on the order, only answer questions about it. |
 
@@ -102,7 +102,10 @@ Sign-up: `/signup` → buyer (single form) or seller (single form, name/email/pa
 
 *(Fill in as things get cut — do this continuously, not at the end.)*
 
-- [ ] Invoices — frontend flow built and working against a local mock; backend endpoints (`/invoices`, see api-requests.md S1.1) not yet confirmed live. Ruled in scope 2026-09-27 (decision-log D19b) — confirm build status with Richard. 
+- [ ] Invoices — frontend flow works against a local mock; backend endpoints (`/invoices`, api-requests.md §1.1) in progress (decision-log D19b/D22). Not part of the demo path.
+- [ ] No refund or auto-cancel for paid orders that never ship — funds stay held, seller unpaid
+- [ ] No auto-release if a buyer never confirms delivery
+- [ ] Cancelled (unpaid) orders count against seller reputation (decision-log D21)
 - [ ] **[NEEDS INPUT]** — buyer reviews (parked, spec item 19)
 - [ ] **[NEEDS INPUT]** — courier-API tracking via Shipbubble sandbox (2h time-boxed stretch, spec item 20). If attempted and it works, this line comes out; if dropped or it fails, tracking stays manual with the "Manually updated by seller" label — that's the spec's own default, not a shortfall. See decision-log D18 for why Shipbubble specifically and not the other named providers.
 - [ ] Disputed orders have no resolution flow in this MVP — payout stays frozen permanently
@@ -113,13 +116,10 @@ Sign-up: `/signup` → buyer (single form) or seller (single form, name/email/pa
 
 ## Testing
 
-## Testing
-
-- Automated: **reported live in CI** (`npx vitest run` in `.github/workflows/ci.yml`, per QA channel update) — **not yet independently verified** that the specific invariant assertions (state-machine transition guards, `sellerKobo + logisticsKobo === order.total_kobo`) are actually among the passing tests, versus a test runner existing with lighter coverage. Confirm by reading the suite before checking QA-02 off.
-- Repo hygiene: PR template, gitleaks CI scan, and a locked `.gitignore` **confirmed** (OPS-01, per QA channel update) 
-- Manual smoke path: seller register → product listed → checkout → sandbox pay → webhook → ship → confirm delivery → payout → dispute path.
-
----
+- **Automated (CI):** `npx vitest run` in GitHub Actions — state-machine transition guards and the payout-split invariant (`sellerKobo + logisticsKobo === total_kobo`). Passing.
+- **Repo hygiene (CI):** gitleaks secret scan on PRs, PR template, branch protection on `main`.
+- **API contract:** Postman collection at `docs/payproof-v1.postman_collection.json` (E01–E24, guard tests, pending invoice endpoints).
+- **Manual smoke path:** seller register → product listed → checkout → sandbox pay → webhook → ship → confirm delivery → payout → dispute path.
 
 ## Team
 

@@ -23,28 +23,35 @@
 |---|---|---|---|---|---|
 | E01 | `POST /auth/seller/register` | public | `{name, email, password, phone, business_name}` | `201 {token, seller, reserved_account:{account_number, bank_name, account_name}}` | BE-03 |
 | E02 | `POST /auth/seller/login` | public | `{email, password}` | `200 {token, seller, reserved_account}` | BE-03 |
-| E03 | `POST /auth/buyer/otp/request` | public | `{email}` | `202 {sent:true, delivery:"email"/"dev_screen", dev_code?}` (`dev_code` only if `OTP_MODE=dev`) | BE-04 |
+| E03 | `POST /auth/buyer/otp/request` | public | `{email}` | `202 {sent:true, delivery:"email"/"dev_screen", dev_code?}` (`dev_code` only in mock/demo mode; live mode sends email via SMTP — D19) | BE-04 |
 | E04 | `POST /auth/buyer/otp/verify` | public | `{email, code}` | `200 {token, buyer:{id,email}}` | BE-04 |
 | E05 | `GET /auth/me` | any | — | `{role, profile}` | BE-03 |
 | E06 | `GET /sellers/:id` | public | — | `{id, business_name, reputation:{score\|null, completed, total, badge}}` | INT-05 |
 | E07 | `GET /sellers/me/dashboard` | seller | — | `{reserved_account, counts_by_status, payouts:{pending_kobo, paid_kobo, frozen_kobo}}` | BE-03 / INT-04 |
 | E08 | `GET /products?seller_id=` | public | — | `[Product]` | INT-02 |
 | E09 | `GET /products/:id` | public | — | `Product` | INT-02 |
-| E10 | `POST /products` | seller | `{name, price_kobo, description, image_url, stock_quantity, dispatch_fee_kobo, delivery_days}` | `201 Product` | INT-02 |
+| E10 | `POST /products` | seller | `{name, price_kobo, description, image_url, stock_quantity, dispatch_fee_kobo?, delivery_days?}` — the last two optional; omitted or 0 → platform default 250000 kobo / 3 days (D20) | `201 Product` | INT-02 |
 | E11 | `PATCH /products/:id` | seller (owner) | partial of E10 | `200 Product` | INT-02 |
+| E11b | `DELETE /products/:id` | seller (owner) | — | `200 {ok:true}` · `409 PRODUCT_HAS_ORDERS` if any order references it | INT-02 |
 | E12 | `POST /orders` | buyer | `{product_id, delivery_address, phone}` | `201 {order, payment:{reference, provider, checkout_url}}` · `409 OUT_OF_STOCK` | BE-07 |
 | E13 | `GET /orders?status=` | buyer/seller | — | `[OrderSummary]` (role-scoped) | BE-07 |
 | E14 | `GET /orders/:id` | party | — | `Order` (full, incl. `events[]`) — **polling target** | BE-06/07 |
 | E15 | `POST /orders/:id/verify` | buyer | — | `200 {order}` — live verify; on rail timeout + `DEMO_FALLBACK=true` uses cached JSON and sets `verification_mode` | BE-11 |
-| E16 | `POST /webhooks/rail` | public + signature | provider payload | `200` (always fast; idempotent) · `401 BAD_SIGNATURE` | BE-08 |
+| E16 | `POST /api/monnify/webhook` (outside `/api/v1`; registered in Monnify) | public + signature | provider payload | `200` (always fast; idempotent) · `401 BAD_SIGNATURE` | BE-08 |
 | E17 | `POST /orders/:id/ship` | seller (owner) | `{tracking_number?, carrier?}` | `200 {order}` — `Awaiting Shipment → Shipped`, `tracking.status="Picked Up"` | INT-04 |
 | E18 | `PATCH /orders/:id/tracking` | seller (owner) | `{tracking_status, tracking_number?}` | `200 {order}` — forward-only; `Delivered` also moves order to `Delivered` | INT-04 |
 | E19 | `POST /orders/:id/confirm-delivery` | buyer (owner) | — | `200 {order, payout}` — → `Completed`, triggers payout | INT-04 / BE-10 |
 | E20 | `POST /orders/:id/report-issue` | buyer (owner) | `{reason}` (required, ≤500 chars) | `200 {order}` — → `Disputed`, payout frozen | INT-04 |
 | E21 | `GET /orders/:id/payout` | party | — | `{status, product_kobo, dispatch_kobo, transfers:[{to, amount_kobo, status, ref}]}` | BE-10 |
 | E22 | `POST /orders/:id/assistant` | party | `{message}` | `200 {answer, order_status, scope:"order"}` | BE-12 |
-| E23 | `GET /health` | public | — | `{ok:true, version, rail:"paystack"}` | BE-00 |
+| E23 | `GET /health` | public | — | `{ok:true, version, rail:"monnify"}` | BE-00 |
 | E24 | `POST /orders/:id/cancel` | buyer (owner) | — | `200 {order}` — only from `Pending Payment` | INT-04 |
+| E25 | `GET /invoices` | seller | — | `[Invoice]` newest first | BE-15 |
+| E26 | `POST /invoices` | seller | `{code?, items:[{product_id, quantity}], customer_name, customer_contact, note?}` — live mode: 1 item, quantity 1 (D22) | `201 Invoice` · `409 OUT_OF_STOCK` | BE-15 |
+| E27 | `GET /invoices/:id` | public | — | `Invoice` + `seller.business_name` | BE-15 |
+| E28 | `POST /invoices/:id/cancel` | seller (owner) | — | `200 Invoice` · `409 INVALID_TRANSITION` unless `pending` | BE-15 |
+
+"Invoice payment creates a normal order via the existing checkout (D22). Paying a cancelled or already-paid invoice → 409. Invoice shape: see api-requests.md §1.1."
 
 ### 7.3 Order object (E14)
 
@@ -58,7 +65,7 @@
   "delivery_days": 3,
   "delivery_address": "...",
   "tracking": { "status": null, "number": null, "source": "manual", "label": "Manually updated by seller" },
-  "payment": { "reference": "pp_ord_xxx", "provider": "paystack", "verification_mode": "live", "paid_at": "..." },
+  "payment": { "reference": "pp_ord_xxx", "provider": "monnify", "verification_mode": "live", "paid_at": "..." },
   "payout": { "status": "none" },
   "fraud_flag": { "triggered": false, "state": "insufficient_history", "label": "Rule-based" },
   "events": [ { "from": "Pending Payment", "to": "Paid", "actor": "system", "at": "...", "note": null } ],
@@ -92,7 +99,7 @@ Pending Payment → Paid → Awaiting Shipment → Shipped → Delivered → Com
 E19 from `Shipped`: performs `Shipped → Delivered → Completed` atomically with two events.
 **Payout guard (belt and braces):** `release()` re-checks `status == Completed`, no `Disputed` ever in event history, and unique `transfer_ref` per (order, recipient).
 
-### 7.5 Rail interface (rail-agnostic; Paystack first)
+### 7.5 Rail interface (rail-agnostic; Monnify implemented)
 
 ```ts
 interface RailProvider {
@@ -106,7 +113,7 @@ interface RailProvider {
 
 ### 7.6 Webhook handling (E16)
 
-1. Keep **raw body** (`express.raw`); verify signature (Paystack `x-paystack-signature` HMAC-SHA512 · Flutterwave `verif-hash`). Bad → `401`.
+1. Keep the **raw body** (Next.js route: read `req.text()` before parsing); verify Monnify's signature header (HMAC-SHA512 of the raw body keyed with the client secret — **[VERIFY against handler]**). Bad → `401`.
 2. Respond `200` fast.
 3. Look up order by `payments.reference`. Unknown → log, ignore.
 4. Idempotency: order not in `Pending Payment` → no-op + log.
@@ -136,6 +143,7 @@ FROM orders WHERE seller_id = $1;
 -- Spec-literal version (if D4 rejected): denominator = COUNT(*) of all orders for seller
 ```
 Badge thresholds computed server-side from `score`. **Never hardcode, never mock, never cache stale.**
+In-flight orders (Pending Payment → Delivered) are excluded from numerator and denominator (D4); `total` means finished orders. `Cancelled` (unpaid abandonment) counts against the seller — known limitation (D21).
 
 Fraud rule: `abs(order.total - avg(seller Completed totals)) / avg > 0.5` → `triggered=true`. <3 Completed → `state="insufficient_history"`. UI label always "Rule-based".
 
@@ -149,5 +157,12 @@ Fraud rule: `abs(order.total - avg(seller Completed totals)) / avg > 0.5` → `t
 ### 7.10 Polling
 
 FE polls E14 every **5s** (10s hidden tab) while status is non-terminal (`Completed`, `Cancelled`, `Disputed`). No websockets.
+
+### 7.11 Known deviations (accepted for MVP)
+| Item | Contract | Live behaviour | Handling |
+|---|---|---|---|
+| Status vocabulary | Spaced (`"Awaiting Shipment"`) | camelCase in some responses (api-requests R1/R3/R6) | FE `STATUS_DISPLAY` shim; no backend change before freeze |
+| `/auth/me` shape | top-level `reserved_account` | nested under `profile` (R5) | FE mapper flattens |
+| Product field casing | snake_case | some camelCase (V4) | FE adapters |
 
 ---

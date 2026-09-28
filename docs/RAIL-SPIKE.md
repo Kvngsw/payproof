@@ -32,7 +32,7 @@ Purpose: prove the 5 rail operations actually work in sandbox before anything el
 ## Known sandbox gotchas to check for (Monnify specifically)
 
 - Monnify reserved accounts require the contract code (present in env) and an active contract on the sandbox merchant — confirm the account creation call actually returns a real account, not a stub.
-- Transfers usually require the sandbox wallet to carry a test balance — check `MONNIFY_WALLET_ACCOUNT_NUMBER` actually has funds, or transfers will fail silently or with an insufficient-balance error.
-- Monnify webhook signature is verified via a hash of the transaction reference + amount using the secret key — confirm BE-08 implements Monnify's specific scheme, not a generic one copied from Paystack/Flutterwave docs.
-- Webhooks need a public URL registered in the Monnify sandbox dashboard — `NEXT_PUBLIC_APP_URL=localhost` strongly suggests this is not yet done.
+- ~~Transfers usually require the sandbox wallet to carry a test balance.~~ **Resolved 2026-09-28:** balance confirmed sufficient and can be topped up.
+- Monnify webhook signature is verified via a hash of the transaction reference + amount using the secret key 
+- ~~Webhooks need a public URL registered in the Monnify sandbox dashboard.~~ **Resolved:** registered at `https://payproof-seven.vercel.app/api/monnify/webhook`.
 
