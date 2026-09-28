@@ -9,6 +9,7 @@ export interface MockOrderRow {
   seller_id: string;
   buyer_email?: string;
   status: string;
+  rating?: number | null;
   amounts: { product_kobo: number; dispatch_fee_kobo: number; total_kobo: number };
   events: { from: string; to: string; actor: string; at: string; note: string | null }[];
   payout: { status: string };

@@ -5,13 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
+  getSeller,
   getSellerDashboard,
   listInvoices,
   type SellerDashboard,
+  type SellerProfile,
   type MockInvoice,
 } from "@/lib/api";
 import { StatsStrip } from "@/components/dashboard/stats-strip";
 import { InvoiceStatusChip } from "@/components/dashboard/invoice-status-chip";
+import { ReputationBadge } from "@/components/reputation-badge";
 import { Amount } from "@/components/amount";
 import { IconPlus, IconPackage } from "@tabler/icons-react";
 import { useDashboardSession } from "@/components/dashboard/session-context";
@@ -98,7 +101,29 @@ export default function DashboardPage() {
   const [dashboard, setDashboard] = useState<SellerDashboard | null>(null);
   const [statsFailed, setStatsFailed] = useState(false);
   const [invoices, setInvoices] = useState<MockInvoice[] | null>(null);
+  const [reputation, setReputation] = useState<
+    SellerProfile["reputation"] | null
+  >(null);
   const role = session.status === "authed" ? session.data.role : null;
+  const sellerId =
+    role === "seller" && session.status === "authed"
+      ? session.data.profile.id
+      : null;
+
+  useEffect(() => {
+    if (!sellerId) return;
+    let cancelled = false;
+    getSeller(sellerId)
+      .then((data) => {
+        if (!cancelled) setReputation(data.reputation);
+      })
+      .catch(() => {
+        /* badge is decorative — home still renders without it */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sellerId]);
 
   useEffect(() => {
     if (role !== "seller") return;
@@ -169,21 +194,22 @@ export default function DashboardPage() {
               .toUpperCase()}
           </span>
           <div>
-            <h1 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl">
-              Hello, {greeting}!
-            </h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl">
+                Hello, {greeting}!
+              </h1>
+              {reputation && <ReputationBadge badge={reputation.badge} />}
+            </div>
             <p className="text-sm text-muted-foreground">
               What&apos;s happening with your invoices and orders.
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {source === "mock" && (
-            <Button onClick={() => router.push("/dashboard/invoices/new")}>
-              <IconPlus className="size-4" />
-              New invoice
-            </Button>
-          )}
+          <Button onClick={() => router.push("/dashboard/invoices/new")}>
+            <IconPlus className="size-4" />
+            New invoice
+          </Button>
           <Button
             variant="outline"
             onClick={() => router.push("/dashboard/inventory")}

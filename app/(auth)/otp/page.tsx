@@ -32,7 +32,14 @@ export default function OtpPage() {
   const [devCode, setDevCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [cooldown, setCooldown] = useState(60);
   const [codeError, setCodeError] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   useEffect(() => {
     // Deferred so state isn't set synchronously inside the effect; sessionStorage
@@ -92,13 +99,14 @@ export default function OtpPage() {
   }
 
   async function resend() {
-    if (!pending || resending) return;
+    if (!pending || resending || cooldown > 0) return;
     setResending(true);
     try {
       const res = await requestOtp(pending.email);
       setDevCode(res.dev_code ?? null);
       setOtpCode("");
       setCodeError(undefined);
+      setCooldown(60);
       toast.success("New code sent!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "An error occurred");
@@ -132,6 +140,10 @@ export default function OtpPage() {
               {maskEmail(pending.email)}
             </span>
             .
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground text-pretty">
+            Nothing in your inbox? Check your spam or junk folder — codes
+            expire after 10 minutes.
           </p>
         </div>
 
@@ -178,10 +190,14 @@ export default function OtpPage() {
             <button
               type="button"
               onClick={resend}
-              disabled={resending}
+              disabled={resending || cooldown > 0}
               className="font-semibold text-primary underline-offset-4 hover:underline disabled:opacity-50"
             >
-              {resending ? "Sending..." : "Resend code"}
+              {resending
+                ? "Sending..."
+                : cooldown > 0
+                  ? `Resend in ${Math.floor(cooldown / 60)}:${String(cooldown % 60).padStart(2, "0")}`
+                  : "Resend code"}
             </button>
             <button
               type="button"

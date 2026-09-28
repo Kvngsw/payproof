@@ -24,10 +24,17 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     const reputation = await getReputation(id);
 
+    const rating = await db.rating.aggregate({
+      where: { sellerId: id },
+      _avg: { stars: true },
+      _count: { _all: true },
+    });
+
     return ok({
       id: seller.id,
       business_name: seller.businessName,
       reputation,
+      rating: { average: rating._avg.stars, count: rating._count._all },
     });
   } catch (err) {
     return handleError(err, 'GET /api/v1/sellers/[id]', requestId);

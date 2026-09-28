@@ -13,7 +13,7 @@ Base URL: `https://payproof-seven.vercel.app/api/v1` · errors already compatibl
 
 | Pri | Ask | Detail | Until it lands |
 |---|---|---|---|
-| **P1** | Invoices endpoints | §1.1 — list/create/public-get/cancel + pay→order flow, Prisma models included | FE invoice pages (4 of 8 dashboard pages) are **hidden in live mode** (`DemoDataNotice`); fully working against mock |
+| **P1** | Invoices endpoints | §1.1 — list/create/public-get/cancel + pay→order flow, Prisma models included | ✅ FE shipped this batch: live gates removed, create form constrained to **1 item × qty 1** (PM ruling), client wired to §1.1 — until the routes exist every call degrades to the friendly *"isn't available on the Live API yet"* message; pay stays stubbed pending §6 |
 | **P1.5** | Auth v2 (password login + OTP for both roles) | §1.4 — breaking seller-register response, `Buyer.passwordHash`/`name` migration | ✅ shipped: FE + mock + v1 (A1–A7, V5) — live OTP needs `SMTP_*` on Vercel; A5 migration applied to local + prod |
 | **P2** | Response shapes | §2 — R1, R3, R5, R6 (high), R2, R4 (medium), **R7 is a security fix** (products list is public & unscoped today) | FE normalizes every response client-side (§4 W1–W3) — works, but adapters stay until you fix the shapes |
 | **P3** | Validation relaxations | §3 — V1–V4, V6 | FE pads/sends silent defaults (§4 W4) — harmless but fragile |
@@ -30,6 +30,12 @@ Already handled on our side (keep when merging): `DELETE /products/:id` shipped 
 Sellers create shareable payment requests. The full flow is live against our local mock API
 (`app/api/mock/invoices/**`) and the contract below is exactly what the frontend ships today —
 please mirror it so the UI works unmodified when switched to `live`.
+
+> **FE update (this batch):** the live `DemoDataNotice` gates are gone. The create form is
+> constrained to **one item, quantity fixed at 1** (PM ruling) and the client sends
+> `items: [{product_id, quantity: 1}]`. Until the routes below exist, calls degrade to the
+> friendly *"isn't available on the Live API yet"* message; `POST /invoices/:id/pay` remains
+> stubbed pending §6.1 (payment rail).
 
 **Suggested Prisma models**
 
@@ -163,12 +169,37 @@ applied to local + prod Supabase.
 | A5 | Prisma migration | `Buyer.passwordHash String?`, `Buyer.name String?` | A1 can't check a password that isn't stored; A3 has nowhere to put `name` |
 | A6 | OTP resend | keep `POST /auth/buyer/otp/request` as-is (it's role-agnostic — just an OTP row keyed by email), or rename to `/auth/otp/request` | the `/otp` page resend button calls it for both roles |
 | A7 | `PATCH /auth/me` | **new** (sellers): `{name?, phone?, business_name?, bvn?(11 digits), settlement?: {bankCode, accountNumber(10 digits)} | null}` → `200 {role:"seller", profile, reserved_account}`; regenerates `reserved_account_name` from `business_name` (fallback `name`) when either changes | FE's dashboard "Finish your profile" card collects business/phone/BVN/settlement *after* signup; mock ships this route now (`app/api/mock/auth/me/route.ts`) |
+| A8 | `PATCH /auth/me` (buyers) | **shipped this batch**: `{name?, phone?}` only → `200 {role:"buyer", profile:{id,name,email,phone,created_at}}`; `400` on `business_name`/`bvn`/`settlement` ("Buyers can only update name and phone."), `400` when nothing to update | FE's profile page buyer card edits name+phone; `GET /auth/me` buyer profile now also returns `phone` |
 
 **Deprecated (FE no longer calls; keep working so scripts don't break):**
 `POST /auth/seller/login` (token-direct), `POST /auth/buyer/otp/verify` (buyer-only token).
 `scripts/phase-b.ts` still drives A6 + the old buyer verify directly — the old verify now
 returns `409` when the email belongs to a seller (uniqueness), and A6 no longer auto-creates
 buyers.
+
+---
+
+### 1.5 Star ratings — shipped in this repo (buyer → seller, one per Completed order)
+
+| Method | Path | Notes |
+|---|---|---|
+| `POST` | `/orders/:id/rating` | buyer auth, body `{stars: int 1–5}` → `201 {id, status, rating}`; `409 DUPLICATE` already rated (mock code too), `409 INVALID_TRANSITION` unless status `Completed`, `400 VALIDATION` for stars out of range; rate limit 20/min per buyer (`act:rate:`) |
+
+- Order detail `GET /orders/:id` embeds `rating: number | null`.
+- `GET /sellers/:id` adds `rating: {average: number|null, count: number}`.
+- Schema: `ratings` table (migration `20260928124029_buyer_phone_ratings` — **apply with
+  `prisma migrate deploy` on prod**; local already migrated).
+- FE: buyer order-detail star widget (Completed only, read-only after the first rate);
+  seller profile shows own average + count.
+
+### 1.6 Storefront + order-detail embeds — shipped in this repo
+
+- `GET /products?seller_id=<uuid>` is the **public, unauthenticated** storefront listing
+  (mock honors `?seller_id=` without a token; v1 already did) — FE page **`/s/[sellerId]`**
+  (board FE-03) with reputation badge (FE-10) + rating summary.
+- `GET /orders/:id` now embeds `buyer: {name, email, created_at, order_count} | null`
+  (mock + v1) → seller-side buyer card on order detail; buyer-side "Seller" row links to
+  `/s/[sellerId]`.
 
 ---
 
@@ -237,6 +268,7 @@ Legend: ✅ exists & wired · ⚠️ exists with gaps (item id) · ❌ missing �
 |---|---|---|---|---|
 | Seller register | ✓ (single-step `/signup/seller`) | ✅ `202 + OTP` (§1.4 A4) | ✅ `202 + OTP`, V5 optional (§1.4 A4) | no token until A2 verify; cross-table email uniqueness → 409 |
 | Seller profile update (business/phone/BVN/settlement) | ✓ (`/dashboard/profile`, avatar → navbar) | ✅ `PATCH /auth/me` (§1.4 A7) | ✅ `PATCH /auth/me` (§1.4 A7) | card moved off dashboard home; A7 regenerates reserved account name; live `updateProfile()` wired (no more stub) |
+| Buyer profile update (name+phone) | ✓ buyer card on `/dashboard/profile` | ✅ §1.4 A8 | ✅ §1.4 A8 | `GET /auth/me` buyer profile returns `phone` |
 | Seller login (password, token-direct) | **—** (replaced by Auth v2) | ✅ kept for scripts | ✅ kept for scripts | FE uses `POST /auth/login` now |
 | **Auth v2**: `POST /auth/login` + `otp/verify` + `buyer/register` | ✓ (single sign-in form, shared `/otp`) | ✅ | ✅ §1.4 (A1–A5) | live OTP requires `SMTP_*` on Vercel; e2e covers negatives (A1 401, A2 400, A3 409) |
 | OTP request/verify (legacy buyer flow) | ✓ resend only | ✅ (`dev_code` + card banner) | ✅ live sends SMTP email (nodemailer) — `SMTP_*` env required | A6 no longer auto-creates buyers; old verify 409s on seller emails; FE uses A2 instead |
@@ -249,8 +281,10 @@ Legend: ✅ exists & wired · ⚠️ exists with gaps (item id) · ❌ missing �
 | Products list | ✓ | ✅ | ⚠️ R7, R8 | |
 | Products create/patch | ✓ | ✅ | ⚠️ V1–V4 | |
 | Products **delete** | ✓ | ✅ | ✅ §1.2 (handler shipped in this repo) | returns `409 PRODUCT_HAS_ORDERS` when referenced |
-| **Invoices** list/create/detail/cancel/public + **pay→order** | ✓ (share link → `/dashboard?invoice=`, inline pay panel on buyer home) | ✅ (§1.1, incl. `POST /invoices/:id/pay`) | ❌ §1.1 | **top priority**; live shows `DemoDataNotice` |
-| Seller public profile + reputation | — | ✅ (parity pass) | ✅ | storefront page planned |
+| **Invoices** list/create/detail/cancel/public + **pay→order** | ✅ live gates removed — constrained form (1 item × qty 1) + graceful 404 fallback | ✅ (§1.1, incl. `POST /invoices/:id/pay`) | ❌ §1.1 | **build §1.1 to light up live**; pay pending §6 |
+| **Star ratings** (POST + order embed + seller avg) | ✓ buyer widget on order detail, seller avg on profile | ✅ §1.5 | ✅ §1.5 | new `ratings` table — prod needs `migrate deploy` |
+| Seller public profile + reputation | ✓ storefront `/s/[sellerId]` (FE-03) + FE-10 badge (storefront + dashboard home) | ✅ + `rating` | ✅ + `rating` | public products via `GET /products?seller_id=` (§1.6) |
+| Order detail buyer embed (`buyer:{name,email,created_at,order_count}`) | ✓ seller-side buyer card | ✅ §1.6 | ✅ §1.6 | buyer "Seller" row links to storefront |
 | Order assistant | ✓ buyer UI | ✅ (stub, canned reply) | ✅ | chat panel on buyer order detail |
 | Auth refresh | — | ✅ (parity pass) | ✅ | FE uses cookie flow |
 | Health | — | ✅ (parity pass) | ✅ | |

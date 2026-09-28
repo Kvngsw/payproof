@@ -116,7 +116,7 @@ export type ProfilePatch = {
 };
 
 export type ProfileResponse = {
-  role: "seller";
+  role: "seller" | "buyer";
   profile: Record<string, unknown> & {
     name?: string;
     phone?: string;
@@ -124,7 +124,7 @@ export type ProfileResponse = {
     bvn?: string;
     settlement?: { bankCode: string; accountNumber: string } | null;
   };
-  reserved_account: {
+  reserved_account?: {
     account_number: string;
     bank_name: string;
     account_name: string;
@@ -182,7 +182,14 @@ export type SellerDashboard = {
 export type MockOrder = {
   id: string;
   status: string;
+  rating?: number | null;
   buyer_email?: string;
+  buyer?: {
+    name: string;
+    email: string;
+    created_at: string | null;
+    order_count: number;
+  } | null;
   product: { id: string; name: string; image_url: string };
   seller: { id: string; business_name: string };
   amounts: {
@@ -223,6 +230,33 @@ export type MockOrder = {
   updated_at: string;
 };
 
+export type SellerProfile = {
+  id: string;
+  business_name: string;
+  reputation: {
+    score: number | null;
+    completed: number;
+    total: number;
+    badge: string;
+  };
+  rating: { average: number | null; count: number };
+};
+
+export async function getSeller(id: string): Promise<SellerProfile> {
+  const res = await fetch(`${API}/sellers/${encodeURIComponent(id)}`);
+  return handleResponse(res);
+}
+
+// Public storefront listing — unauthenticated, seller-scoped (§2 R7).
+export async function listPublicProducts(
+  sellerId: string,
+): Promise<MockProduct[]> {
+  const res = await fetch(
+    `${API}/products?seller_id=${encodeURIComponent(sellerId)}`,
+  );
+  return handleResponse(res);
+}
+
 export async function getSellerDashboard(): Promise<SellerDashboard> {
   return authFetch("/sellers/me/dashboard");
 }
@@ -233,6 +267,14 @@ export async function listOrders(status?: string): Promise<MockOrder[]> {
 
 export async function getOrder(id: string): Promise<MockOrder> {
   return authFetch(`/orders/${encodeURIComponent(id)}`);
+}
+
+export async function rateOrder(id: string, stars: number): Promise<MockOrder> {
+  await authFetch(`/orders/${encodeURIComponent(id)}/rating`, {
+    method: "POST",
+    body: JSON.stringify({ stars }),
+  });
+  return getOrder(id);
 }
 
 export async function shipOrder(

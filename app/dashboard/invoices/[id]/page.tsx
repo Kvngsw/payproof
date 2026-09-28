@@ -10,10 +10,8 @@ import {
   getInvoice,
   invoiceLink,
   type MockInvoice,
-} from "@/lib/api/mock";
+} from "@/lib/api";
 import { useDashboardSession, useRequireSeller } from "@/components/dashboard/session-context";
-import { useDataSource } from "@/lib/api";
-import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
 import { InvoiceBarcode } from "@/components/dashboard/invoice-barcode";
 import { InvoiceStatusChip } from "@/components/dashboard/invoice-status-chip";
@@ -72,9 +70,8 @@ export default function InvoiceDetailPage() {
   useRequireSeller();
   const params = useParams<{ id: string }>();
   const session = useDashboardSession();
-  const source = useDataSource();
   const [invoice, setInvoice] = useState<MockInvoice | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -85,8 +82,11 @@ export default function InvoiceDetailPage() {
       .then((data) => {
         if (!cancelled) setInvoice(data);
       })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
+      .catch((err) => {
+        if (!cancelled)
+          setFailed(
+            err instanceof Error ? err.message : "Couldn't load this invoice.",
+          );
       });
     return () => {
       cancelled = true;
@@ -133,20 +133,12 @@ export default function InvoiceDetailPage() {
     );
   }
 
-  if (source === "live") {
-    return (
-      <div className="space-y-6">
-        <DemoDataNotice />
-      </div>
-    );
-  }
-
   if (failed || !invoice) {
     return (
       <div className="rounded-xl border border-dashed border-border/60 p-10 text-center">
         <h1 className="font-heading text-lg font-bold">Invoice not found</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          It may have been cancelled, or the link is wrong.
+          {failed ?? "It may have been cancelled, or the link is wrong."}
         </p>
         <Link
           href="/dashboard/invoices"

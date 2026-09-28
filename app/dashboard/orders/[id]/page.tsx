@@ -8,6 +8,7 @@ import { useDashboardSession } from "@/components/dashboard/session-context";
 import { OrderActions } from "@/components/dashboard/order-actions";
 import { BuyerOrderActions } from "@/components/dashboard/buyer-order-actions";
 import { OrderAssistant } from "@/components/dashboard/order-assistant";
+import { OrderRatingStars } from "@/components/dashboard/order-rating";
 import { StatusChip } from "@/components/status-chip";
 import { Amount } from "@/components/amount";
 import {
@@ -278,9 +279,20 @@ export default function OrderDetailPage() {
             <SectionHeading>Order details</SectionHeading>
             <dl className="mt-2">
               <Row label={isBuyer ? "Seller" : "Buyer"}>
-                {isBuyer
-                  ? order.seller.business_name || "—"
-                  : (order.buyer_email ?? "—")}
+                {isBuyer ? (
+                  order.seller.id ? (
+                    <Link
+                      href={`/s/${order.seller.id}`}
+                      className="text-primary hover:underline"
+                    >
+                      {order.seller.business_name || "—"}
+                    </Link>
+                  ) : (
+                    order.seller.business_name || "—"
+                  )
+                ) : (
+                  (order.buyer?.name ?? order.buyer_email ?? "—")
+                )}
               </Row>
               <Row label="Delivery address">{order.delivery_address}</Row>
               <Row label="Tracking">
@@ -339,6 +351,32 @@ export default function OrderDetailPage() {
               )}
             </div>
           </section>
+
+          {isBuyer && order.status === "Completed" && (
+            <section>
+              <SectionHeading>Rate your seller</SectionHeading>
+              <OrderRatingStars order={order} onRated={setOrder} />
+            </section>
+          )}
+
+          {!isBuyer && order.buyer && (
+            <section>
+              <SectionHeading>Buyer</SectionHeading>
+              <dl className="mt-2">
+                <Row label="Name">{order.buyer.name}</Row>
+                <Row label="Email">{order.buyer.email}</Row>
+                {order.buyer.created_at && (
+                  <Row label="Member since">
+                    {formatDateTime(order.buyer.created_at)}
+                  </Row>
+                )}
+                <Row label="Orders">
+                  {order.buyer.order_count}{" "}
+                  {order.buyer.order_count === 1 ? "order" : "orders"}
+                </Row>
+              </dl>
+            </section>
+          )}
 
           <section>
             <SectionHeading>Payment &amp; payout</SectionHeading>

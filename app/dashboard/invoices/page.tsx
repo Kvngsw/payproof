@@ -25,10 +25,8 @@ import {
   invoiceLink,
   listInvoices,
   type MockInvoice,
-} from "@/lib/api/mock";
+} from "@/lib/api";
 import { useDashboardSession, useRequireSeller } from "@/components/dashboard/session-context";
-import { useDataSource } from "@/lib/api";
-import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
 import { InvoiceStatusChip } from "@/components/dashboard/invoice-status-chip";
 import { Amount } from "@/components/amount";
@@ -83,9 +81,8 @@ export default function InvoicesPage() {
   useRequireSeller();
   const router = useRouter();
   const session = useDashboardSession();
-  const source = useDataSource();
   const [invoices, setInvoices] = useState<MockInvoice[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const [view, setView] = useState<"open" | "all">("open");
 
   useEffect(() => {
@@ -95,8 +92,11 @@ export default function InvoicesPage() {
       .then((data) => {
         if (!cancelled) setInvoices(data);
       })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
+      .catch((err) => {
+        if (!cancelled)
+          setFailed(
+            err instanceof Error ? err.message : "Couldn't load your invoices.",
+          );
       });
     return () => {
       cancelled = true;
@@ -119,19 +119,6 @@ export default function InvoicesPage() {
   const visible =
     invoices?.filter((invoice) => view === "all" || invoice.status === "pending") ??
     [];
-
-  if (source === "live") {
-    return (
-      <div className="space-y-6">
-        <header>
-          <h1 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl">
-            Invoices
-          </h1>
-        </header>
-        <DemoDataNotice />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -185,17 +172,23 @@ export default function InvoicesPage() {
         </div>
       ) : failed ? (
         <div className="rounded-xl border border-dashed border-border/60 p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            Couldn&apos;t load your invoices.
-          </p>
+          <p className="text-sm text-muted-foreground">{failed}</p>
           <Button
             variant="outline"
             size="sm"
             className="mt-4"
             onClick={() => {
-              setFailed(false);
+              setFailed(null);
               setInvoices(null);
-              listInvoices().then(setInvoices).catch(() => setFailed(true));
+              listInvoices()
+                .then(setInvoices)
+                .catch((err) =>
+                  setFailed(
+                    err instanceof Error
+                      ? err.message
+                      : "Couldn't load your invoices.",
+                  ),
+                );
             }}
           >
             Try again

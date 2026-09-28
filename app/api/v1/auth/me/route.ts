@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
 
     const buyer = await db.buyer.findUnique({
       where: { id: String(claims.sub) },
-      select: { id: true, email: true },
+      select: { id: true, name: true, email: true, phone: true, createdAt: true },
     });
 
     if (!buyer) {
@@ -74,7 +74,16 @@ export async function GET(request: NextRequest) {
       return unauthorized('Session expired. Please log in again.');
     }
 
-    return ok({ role: 'buyer', profile: buyer });
+    return ok({
+      role: 'buyer',
+      profile: {
+        id: buyer.id,
+        name: buyer.name,
+        email: buyer.email,
+        phone: buyer.phone,
+        created_at: buyer.createdAt,
+      },
+    });
   } catch (err) {
     return handleError(err, 'GET /api/v1/auth/me', requestId);
   }
@@ -104,7 +113,55 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const claims = authenticate(request);
-    if (!claims || claims.role !== 'seller') {
+    if (!claims) {
+      return unauthorized();
+    }
+
+    if (claims.role === 'buyer') {
+      // A7 buyer branch: buyers may update name + phone only.
+      const raw = await request.json().catch(() => ({}));
+      const parsed = PatchSchema.safeParse(raw);
+      if (!parsed.success) {
+        return badRequest(parsed.error.issues[0].message);
+      }
+      const body = parsed.data;
+      if (body.business_name !== undefined || body.bvn !== undefined || body.settlement !== undefined) {
+        return badRequest('Buyers can only update name and phone.');
+      }
+      if (body.name === undefined && body.phone === undefined) {
+        return badRequest('No fields to update.');
+      }
+
+      const buyer = await db.buyer.findUnique({ where: { id: String(claims.sub) } });
+      if (!buyer) {
+        return unauthorized('Session expired. Please log in again.');
+      }
+
+      const data: Prisma.BuyerUpdateInput = {};
+      if (body.name !== undefined) data.name = body.name;
+      if (body.phone !== undefined) data.phone = body.phone.trim();
+
+      const updated = await db.buyer.update({ where: { id: buyer.id }, data });
+
+      logger.info('Buyer profile updated (PATCH me)', {
+        buyerId: updated.id,
+        fields: Object.keys(data),
+        requestId,
+      });
+
+      return ok({
+        role: 'buyer',
+        profile: {
+          id: updated.id,
+          name: updated.name,
+          email: updated.email,
+          phone: updated.phone,
+          created_at: updated.createdAt,
+        },
+      });
+    }
+
+    if (claims.role !== 'seller') {
       return unauthorized('Seller token required.');
     }
 

@@ -15,6 +15,7 @@ export {
 export type {
   CountsByStatus,
   SellerDashboard,
+  SellerProfile,
   MockOrder,
   MockProduct,
   MockInvoiceItem,
@@ -78,6 +79,20 @@ export function listOrders(status?: string) {
 
 export function getOrder(id: string) {
   return isLive() ? live.getOrder(id) : mock.getOrder(id);
+}
+
+export function rateOrder(id: string, stars: number) {
+  return isLive() ? live.rateOrder(id, stars) : mock.rateOrder(id, stars);
+}
+
+export function getSeller(id: string) {
+  return isLive() ? live.getSeller(id) : mock.getSeller(id);
+}
+
+export function listPublicProducts(sellerId: string) {
+  return isLive()
+    ? live.listPublicProducts(sellerId)
+    : mock.listPublicProducts(sellerId);
 }
 
 export function shipOrder(
@@ -158,15 +173,15 @@ export function listInvoices() {
 }
 
 export function createInvoice(payload: Parameters<typeof mock.createInvoice>[0]) {
-  return isLive() ? live.createInvoice() : mock.createInvoice(payload);
+  return isLive() ? live.createInvoice(payload) : mock.createInvoice(payload);
 }
 
 export function cancelInvoice(id: string) {
-  return isLive() ? live.cancelInvoice() : mock.cancelInvoice(id);
+  return isLive() ? live.cancelInvoice(id) : mock.cancelInvoice(id);
 }
 
 export function getInvoice(id: string) {
-  return isLive() ? live.getInvoice() : mock.getInvoice(id);
+  return isLive() ? live.getInvoice(id) : mock.getInvoice(id);
 }
 
 export function payInvoice(

@@ -12,12 +12,11 @@ import { FieldError } from "@/components/ui/field";
 import {
   createInvoice,
   listProducts,
+  useDataSource,
   type MockProduct,
-} from "@/lib/api/mock";
+} from "@/lib/api";
 import { hasErrors, required, type FieldErrors } from "@/lib/form";
 import { useDashboardSession, useRequireSeller } from "@/components/dashboard/session-context";
-import { useDataSource } from "@/lib/api";
-import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
 import { InvoiceBarcode } from "@/components/dashboard/invoice-barcode";
 import { BlankBar } from "@/components/dashboard/blank-bar";
@@ -42,6 +41,8 @@ export default function NewInvoicePage() {
   const router = useRouter();
   const session = useDashboardSession();
   const source = useDataSource();
+  // Live invoices are single-item, quantity fixed at 1 (PM ruling).
+  const isLive = source === "live";
   const [products, setProducts] = useState<MockProduct[] | null>(null);
   const [selected, setSelected] = useState<Record<string, number>>({});
   const [customerName, setCustomerName] = useState("");
@@ -79,6 +80,10 @@ export default function NewInvoicePage() {
   function setQty(product: MockProduct, qty: number) {
     if (errors.items) setErrors((prev) => ({ ...prev, items: undefined }));
     setSelected((prev) => {
+      if (isLive) {
+        if (qty <= 0) return {};
+        return { [product.id]: 1 };
+      }
       const next = { ...prev };
       if (qty <= 0) delete next[product.id];
       else next[product.id] = Math.min(qty, product.stock_quantity);
@@ -129,14 +134,6 @@ export default function NewInvoicePage() {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
       setBusy(false);
     }
-  }
-
-  if (source === "live") {
-    return (
-      <div className="space-y-6">
-        <DemoDataNotice />
-      </div>
-    );
   }
 
   return (
@@ -222,31 +219,37 @@ export default function NewInvoicePage() {
                             Out of stock
                           </span>
                         ) : isSelected ? (
-                          <span
-                            className="flex shrink-0 items-center gap-0.5 rounded-full border border-border/60 bg-background"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              aria-label={`Decrease ${p.name}`}
-                              className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
-                              onClick={() => setQty(p, qty - 1)}
-                            >
-                              <IconMinus className="size-3.5" />
-                            </button>
-                            <span className="w-5 text-center text-sm font-medium tabular-nums">
-                              {qty}
+                          isLive ? (
+                            <span className="shrink-0 rounded-full border border-border/60 bg-background px-2.5 py-1 text-xs font-medium tabular-nums">
+                              &times;1
                             </span>
-                            <button
-                              type="button"
-                              aria-label={`Increase ${p.name}`}
-                              disabled={qty >= p.stock_quantity}
-                              className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
-                              onClick={() => setQty(p, qty + 1)}
+                          ) : (
+                            <span
+                              className="flex shrink-0 items-center gap-0.5 rounded-full border border-border/60 bg-background"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <IconPlus className="size-3.5" />
-                            </button>
-                          </span>
+                              <button
+                                type="button"
+                                aria-label={`Decrease ${p.name}`}
+                                className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+                                onClick={() => setQty(p, qty - 1)}
+                              >
+                                <IconMinus className="size-3.5" />
+                              </button>
+                              <span className="w-5 text-center text-sm font-medium tabular-nums">
+                                {qty}
+                              </span>
+                              <button
+                                type="button"
+                                aria-label={`Increase ${p.name}`}
+                                disabled={qty >= p.stock_quantity}
+                                className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                                onClick={() => setQty(p, qty + 1)}
+                              >
+                                <IconPlus className="size-3.5" />
+                              </button>
+                            </span>
+                          )
                         ) : (
                           <span className="size-5 shrink-0 rounded-full border-2 border-border" />
                         )}
@@ -505,8 +508,9 @@ export default function NewInvoicePage() {
 
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <IconPackage className="size-3.5" />
-            Set quantities per item. Dispatch fee and delivery time are
-            calculated by PayProof.
+            {isLive
+              ? "One item per invoice, quantity fixed at 1. Dispatch fee and delivery time are calculated by PayProof."
+              : "Set quantities per item. Dispatch fee and delivery time are calculated by PayProof."}
           </p>
         </div>
       </div>

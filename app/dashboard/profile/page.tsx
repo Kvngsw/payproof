@@ -1,18 +1,18 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { updateProfile } from "@/lib/api";
+import { getSeller, updateProfile, type SellerProfile } from "@/lib/api";
 import {
   IconMail,
   IconPhone,
   IconCalendar,
   IconBuildingBank,
+  IconUser,
+  IconIdBadge2,
+  IconStar,
 } from "@tabler/icons-react";
-import {
-  useDashboardSession,
-  useRequireSeller,
-} from "@/components/dashboard/session-context";
+import { useDashboardSession } from "@/components/dashboard/session-context";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,15 +34,40 @@ type ProfileLike = {
   created_at?: string;
 };
 
-function SellerDetailsCard({ profile }: { profile: ProfileLike }) {
-  const memberSince = profile.created_at
-    ? new Date(profile.created_at).toLocaleDateString("en-NG", {
-        month: "short",
-        year: "numeric",
-      })
-    : null;
+type ReservedAccount = {
+  account_number?: string | null;
+  bank_name?: string | null;
+  account_name?: string | null;
+};
+
+function memberSinceLabel(created?: string) {
+  if (!created) return null;
+  return new Date(created).toLocaleDateString("en-NG", {
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function SellerDetailsCard({
+  profile,
+  reserved,
+  rating,
+}: {
+  profile: ProfileLike;
+  reserved?: ReservedAccount;
+  rating?: SellerProfile["rating"] | null;
+}) {
+  const memberSince = memberSinceLabel(profile.created_at);
 
   const rows = [
+    {
+      icon: IconStar,
+      label: "Rating",
+      value:
+        rating && rating.count > 0
+          ? `${rating.average?.toFixed(1) ?? "—"} average · ${rating.count} rating${rating.count === 1 ? "" : "s"}`
+          : "No ratings yet",
+    },
     { icon: IconMail, label: "Email", value: profile.email },
     ...(profile.phone
       ? [{ icon: IconPhone, label: "Phone", value: profile.phone }]
@@ -76,14 +101,41 @@ function SellerDetailsCard({ profile }: { profile: ProfileLike }) {
           </h2>
         </div>
         <dl className="grid gap-4 pt-5">
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-              {profile.business_name ? "Business name" : "Name"}
-            </dt>
-            <dd className="pt-1 text-sm font-medium">
-              {profile.business_name ?? profile.name ?? "Not set"}
-            </dd>
+          <div className="flex items-start gap-3">
+            <IconUser className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Name
+              </dt>
+              <dd className="pt-0.5 text-sm font-medium">
+                {profile.name ?? "Not set"}
+              </dd>
+            </div>
           </div>
+          {profile.business_name && (
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Business name
+              </dt>
+              <dd className="pt-1 text-sm font-medium">
+                {profile.business_name}
+              </dd>
+            </div>
+          )}
+          {reserved?.account_number && (
+            <div className="flex items-start gap-3">
+              <IconIdBadge2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Reserved account (buyers pay in)
+                </dt>
+                <dd className="pt-0.5 break-all text-sm font-medium">
+                  {reserved.account_name} · {reserved.account_number} ·{" "}
+                  {reserved.bank_name}
+                </dd>
+              </div>
+            </div>
+          )}
           {rows.map((row) => (
             <div key={row.label} className="flex items-start gap-3">
               <row.icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
@@ -115,6 +167,7 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") ?? "").trim();
     const business_name = String(form.get("business_name") ?? "").trim();
     const phone = String(form.get("phone") ?? "").trim();
     const bvn = String(form.get("bvn") ?? "").trim();
@@ -122,6 +175,10 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
     const accountNumber = String(form.get("account_number") ?? "").trim();
 
     const nextErrors: FieldErrors = {
+      name: first(
+        required(name, "Name"),
+        pattern(name, /^.{2,}$/, "Name must be at least 2 characters"),
+      ),
       business_name: required(business_name, "Business name"),
       phone: required(phone, "Phone number"),
       bvn: first(
@@ -143,6 +200,7 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
     setBusy(true);
     try {
       await updateProfile({
+        name,
         business_name,
         phone,
         bvn,
@@ -168,12 +226,26 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
           </h2>
         </div>
         <p className="pt-4 text-sm leading-relaxed text-muted-foreground text-pretty">
-          Your business name shows on invoices and names your reserved account
-          where buyers pay in. BVN and settlement details tell us where payouts
-          land.
+          Your name and business name show on invoices; the business name also
+          names your reserved account where buyers pay in. BVN and settlement
+          details tell us where payouts land.
         </p>
         <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-5">
           <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="setup-name">Name</FieldLabel>
+              <Input
+                id="setup-name"
+                name="name"
+                autoComplete="name"
+                placeholder="Ada Obi"
+                defaultValue={profile.name ?? ""}
+                required
+                aria-invalid={errors.name ? true : undefined}
+                onChange={() => clearError("name")}
+              />
+              <FieldError>{errors.name}</FieldError>
+            </Field>
             <Field>
               <FieldLabel htmlFor="setup-business">Business name</FieldLabel>
               <Input
@@ -278,9 +350,146 @@ function ProfileSetupCard({ profile }: { profile: ProfileLike }) {
   );
 }
 
+function BuyerProfileCard({ profile }: { profile: ProfileLike }) {
+  const { refresh } = useDashboardSession();
+  const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const memberSince = memberSinceLabel(profile.created_at);
+
+  function clearError(key: string) {
+    setErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  }
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") ?? "").trim();
+    const phone = String(form.get("phone") ?? "").trim();
+
+    const nextErrors: FieldErrors = {
+      name: first(
+        required(name, "Name"),
+        pattern(name, /^.{2,}$/, "Name must be at least 2 characters"),
+      ),
+      phone: first(
+        required(phone, "Phone number"),
+        pattern(phone, /^\+?[\d\s-]{10,}$/, "Enter a valid phone number"),
+      ),
+    };
+    setErrors(nextErrors);
+    if (hasErrors(nextErrors)) return;
+
+    setBusy(true);
+    try {
+      await updateProfile({ name, phone });
+      refresh();
+      toast.success("Profile saved");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not save your profile",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl bg-secondary p-1">
+      <section className="rounded-xl border border-border/60 bg-card p-6">
+        <div className="border-b border-dashed border-border/60 pb-3">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            Your profile
+          </h2>
+        </div>
+
+        <dl className="grid gap-4 pt-5">
+          <div className="flex items-start gap-3">
+            <IconMail className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                Email
+              </dt>
+              <dd className="pt-0.5 break-all text-sm font-medium">
+                {profile.email}
+              </dd>
+            </div>
+          </div>
+          {memberSince && (
+            <div className="flex items-start gap-3">
+              <IconCalendar className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Member since
+                </dt>
+                <dd className="pt-0.5 text-sm font-medium">{memberSince}</dd>
+              </div>
+            </div>
+          )}
+        </dl>
+
+        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5 pt-6">
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="buyer-name">Name</FieldLabel>
+              <Input
+                id="buyer-name"
+                name="name"
+                autoComplete="name"
+                placeholder="Hauwa Bello"
+                defaultValue={profile.name ?? ""}
+                required
+                aria-invalid={errors.name ? true : undefined}
+                onChange={() => clearError("name")}
+              />
+              <FieldError>{errors.name}</FieldError>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="buyer-phone">Phone number</FieldLabel>
+              <Input
+                id="buyer-phone"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                placeholder="+234 800 000 0000"
+                defaultValue={profile.phone ?? ""}
+                required
+                aria-invalid={errors.phone ? true : undefined}
+                onChange={() => clearError("phone")}
+              />
+              <FieldError>{errors.phone}</FieldError>
+            </Field>
+          </FieldGroup>
+          <Button type="submit" disabled={busy} className="w-full sm:w-auto">
+            {busy ? "Saving..." : "Save profile"}
+          </Button>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const session = useDashboardSession();
-  useRequireSeller();
+  const [rating, setRating] = useState<SellerProfile["rating"] | null>(null);
+  const sellerId =
+    session.status === "authed" && session.data.role === "seller"
+      ? session.data.profile.id
+      : null;
+
+  useEffect(() => {
+    if (!sellerId) return;
+    let cancelled = false;
+    getSeller(sellerId)
+      .then((seller) => {
+        if (!cancelled) setRating(seller.rating);
+      })
+      .catch(() => {
+        /* rating is a nice-to-have — profile still renders without it */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sellerId]);
 
   if (session.status === "loading") {
     return (
@@ -294,12 +503,12 @@ export default function ProfilePage() {
     );
   }
 
-  if (session.status !== "authed" || session.data.role !== "seller") {
-    // Buyer sessions are redirected home by useRequireSeller.
+  if (session.status !== "authed") {
     return null;
   }
 
-  const { profile } = session.data;
+  const { profile, reserved_account } = session.data;
+  const isBuyer = session.data.role === "buyer";
 
   return (
     <div className="space-y-6">
@@ -308,14 +517,26 @@ export default function ProfilePage() {
           Profile
         </h1>
         <p className="text-sm text-muted-foreground">
-          Business details, BVN and payout account.
+          {isBuyer
+            ? "Your name and contact details."
+            : "Business details, BVN and payout account."}
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <ProfileSetupCard profile={profile} />
-        <SellerDetailsCard profile={profile} />
-      </div>
+      {isBuyer ? (
+        <div className="max-w-xl">
+          <BuyerProfileCard profile={profile} />
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+          <ProfileSetupCard profile={profile} />
+          <SellerDetailsCard
+            profile={profile}
+            reserved={reserved_account}
+            rating={rating}
+          />
+        </div>
+      )}
     </div>
   );
 }

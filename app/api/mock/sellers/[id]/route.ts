@@ -25,6 +25,20 @@ function reputation(sellerId: string) {
   return { score, completed, total, badge };
 }
 
+function ratingSummary(sellerId: string) {
+  const stars = db.orders
+    .findBySeller(sellerId)
+    .map((o: { rating?: number | null }) =>
+      typeof o.rating === "number" ? o.rating : null,
+    )
+    .filter((s): s is number => s !== null);
+  if (stars.length === 0) return { average: null, count: 0 };
+  return {
+    average: stars.reduce((sum, s) => sum + s, 0) / stars.length,
+    count: stars.length,
+  };
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -42,5 +56,6 @@ export async function GET(
     id: seller.id,
     business_name: seller.business_name,
     reputation: reputation(seller.id),
+    rating: ratingSummary(seller.id),
   });
 }
