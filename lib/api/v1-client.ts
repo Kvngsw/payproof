@@ -10,6 +10,7 @@ import {
   type ProfilePatch,
   type ProfileResponse,
   type SellerDashboard,
+  type SellerProfile,
 } from "./mock";
 
 const AUTH = "/api/v1/auth";
@@ -84,8 +85,15 @@ function derivePayout(status: string): string {
 interface RawOrder {
   id?: string;
   status?: string;
+  rating?: number | null;
   buyer_email?: string;
   buyerEmail?: string;
+  buyer?: {
+    name?: string | null;
+    email?: string;
+    created_at?: string | null;
+    order_count?: number;
+  } | null;
   product?: { id?: string; name?: string; image_url?: string; imageUrl?: string };
   seller?: { id?: string; business_name?: string; businessName?: string };
   amounts?: { product_kobo?: number; dispatch_fee_kobo?: number; total_kobo?: number };
@@ -123,7 +131,16 @@ function normalizeOrder(raw: RawOrder): MockOrder {
   return {
     id: raw.id,
     status,
+    rating: raw.rating ?? null,
     buyer_email: raw.buyer_email ?? raw.buyerEmail ?? undefined,
+    buyer: raw.buyer
+      ? {
+          name: raw.buyer.name ?? raw.buyer.email ?? "",
+          email: raw.buyer.email ?? "",
+          created_at: raw.buyer.created_at ?? null,
+          order_count: raw.buyer.order_count ?? 0,
+        }
+      : null,
     product: {
       id: product.id ?? "",
       name: product.name ?? "",
@@ -310,6 +327,7 @@ export async function getMe() {
         id: profile.id,
         name: profile.name,
         email: profile.email,
+        phone: profile.phone,
         created_at: profile.created_at ?? profile.createdAt,
       },
     };
@@ -363,6 +381,45 @@ export async function listOrders(status?: string): Promise<MockOrder[]> {
 export async function getOrder(id: string): Promise<MockOrder> {
   const row = await authFetch(`/orders/${encodeURIComponent(id)}`);
   return normalizeOrder(row);
+}
+
+export async function rateOrder(id: string, stars: number): Promise<MockOrder> {
+  await authFetch(`/orders/${encodeURIComponent(id)}/rating`, {
+    method: "POST",
+    body: JSON.stringify({ stars }),
+  });
+  return getOrder(id); // mutation returns a partial object — refetch (W3)
+}
+
+// Public seller profile — no auth (storefront / reputation badge).
+export async function getSeller(id: string): Promise<SellerProfile> {
+  const res = await fetch(`${API}/sellers/${encodeURIComponent(id)}`);
+  const data = await handleResponse(res);
+  return {
+    id: data.id,
+    business_name: data.business_name ?? "",
+    reputation: data.reputation ?? {
+      score: null,
+      completed: 0,
+      total: 0,
+      badge: "No history yet",
+    },
+    rating: {
+      average: data.rating?.average ?? null,
+      count: data.rating?.count ?? 0,
+    },
+  };
+}
+
+// Public storefront listing — unauthenticated, seller-scoped (§2 R7).
+export async function listPublicProducts(
+  sellerId: string,
+): Promise<MockProduct[]> {
+  const res = await fetch(
+    `${API}/products?seller_id=${encodeURIComponent(sellerId)}`,
+  );
+  const rows = await handleResponse(res);
+  return (Array.isArray(rows) ? rows : []).map(normalizeProduct);
 }
 
 export async function shipOrder(
@@ -514,27 +571,102 @@ export async function deleteProduct(id: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Invoices: not implemented on the backend yet (docs/api-requests.md §1.1)
+// Invoices (docs/api-requests.md §1.1). Wired to the contract; until the BE
+// ships the routes, handleResponse turns the HTML 404 into the friendly
+// "isn't available on the Live API yet" message. FE ruling: live invoices are
+// single-item, quantity fixed at 1 (enforced by the form + below).
 // ---------------------------------------------------------------------------
 
-export async function listInvoices(): Promise<MockInvoice[]> {
-  return [];
+type RawInvoice = {
+  id: string;
+  seller_id?: string;
+  items?: {
+    product_id: string;
+    name: string;
+    image_url?: string | null;
+    quantity: number;
+    unit_price_kobo: number;
+  }[];
+  product_kobo?: number;
+  dispatch_fee_kobo?: number;
+  total_kobo?: number;
+  customer?: { name?: string; contact?: string };
+  note?: string;
+  status?: string;
+  order_id?: string | null;
+  created_at?: string;
+  paid_at?: string | null;
+};
+
+function normalizeInvoice(raw: RawInvoice): MockInvoice {
+  return {
+    id: raw.id,
+    seller_id: raw.seller_id ?? "",
+    items: (raw.items ?? []).map((item) => ({
+      product_id: item.product_id,
+      name: item.name,
+      image_url: item.image_url ?? "",
+      quantity: item.quantity,
+      unit_price_kobo: item.unit_price_kobo,
+    })),
+    product_kobo: raw.product_kobo ?? 0,
+    dispatch_fee_kobo: raw.dispatch_fee_kobo ?? 0,
+    total_kobo: raw.total_kobo ?? 0,
+    customer: {
+      name: raw.customer?.name ?? "",
+      contact: raw.customer?.contact ?? "",
+    },
+    note: raw.note ?? "",
+    status: (raw.status as MockInvoice["status"]) ?? "pending",
+    order_id: raw.order_id ?? null,
+    created_at: raw.created_at ?? new Date().toISOString(),
+    paid_at: raw.paid_at ?? null,
+  };
 }
 
+export async function listInvoices(): Promise<MockInvoice[]> {
+  const data = await authFetch("/invoices");
+  const rows: RawInvoice[] = Array.isArray(data)
+    ? data
+    : ((data?.invoices as RawInvoice[] | undefined) ?? []);
+  return rows.map(normalizeInvoice);
+}
+
+export async function createInvoice(payload: {
+  code: string;
+  items: { product_id: string; quantity: number }[];
+  customer_name: string;
+  customer_contact?: string;
+  note?: string;
+}): Promise<MockInvoice> {
+  const data = await authFetch("/invoices", {
+    method: "POST",
+    body: JSON.stringify({
+      ...payload,
+      items: payload.items
+        .slice(0, 1)
+        .map((item) => ({ product_id: item.product_id, quantity: 1 })),
+    }),
+  });
+  return normalizeInvoice(data);
+}
+
+export async function getInvoice(id: string): Promise<MockInvoice> {
+  // Public route — buyers open the share link without a token (§1.1).
+  const res = await fetch(`${API}/invoices/${encodeURIComponent(id)}`);
+  return normalizeInvoice(await handleResponse(res));
+}
+
+export async function cancelInvoice(id: string): Promise<MockInvoice> {
+  const data = await authFetch(`/invoices/${encodeURIComponent(id)}/cancel`, {
+    method: "POST",
+  });
+  return normalizeInvoice(data);
+}
+
+// Pay stays stubbed until §6 settles the invoice payment rail.
 const INVOICES_LIVE_HINT =
   "Invoices run on demo data for now — switch the data source to Demo data.";
-
-export async function createInvoice(): Promise<MockInvoice> {
-  throw new Error(INVOICES_LIVE_HINT);
-}
-
-export async function cancelInvoice(): Promise<MockInvoice> {
-  throw new Error(INVOICES_LIVE_HINT);
-}
-
-export async function getInvoice(): Promise<MockInvoice> {
-  throw new Error(INVOICES_LIVE_HINT);
-}
 
 export async function payInvoice(): Promise<{ order_id: string }> {
   throw new Error(INVOICES_LIVE_HINT);
@@ -558,6 +690,19 @@ export async function updateProfile(
     body: JSON.stringify(payload),
   });
   const data = await handleResponse(res);
+  if (data.role !== "seller") {
+    const profile = data.profile ?? {};
+    return {
+      role: data.role,
+      profile: {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        phone: profile.phone,
+        created_at: profile.created_at ?? profile.createdAt,
+      },
+    };
+  }
   const profile = data.profile ?? {};
   const reserved = data.reserved_account ?? profile.reserved_account;
   return {

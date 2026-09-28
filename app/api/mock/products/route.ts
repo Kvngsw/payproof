@@ -10,6 +10,23 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const sellerId = new URL(request.url).searchParams.get("seller_id");
+
+  // Public storefront path: ?seller_id= returns that seller's products, no auth.
+  if (sellerId) {
+    const owner = db.sellers.findById(sellerId);
+    if (!owner) {
+      return NextResponse.json(
+        { error: { code: "NOT_FOUND", message: "Seller not found." } },
+        { status: 404 },
+      );
+    }
+    const publicProducts = db.products
+      .findBySeller(owner.id)
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    return NextResponse.json(publicProducts);
+  }
+
   const authHeader = request.headers.get("authorization");
   const user = verifyToken(authHeader);
 

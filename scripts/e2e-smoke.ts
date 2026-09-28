@@ -177,6 +177,8 @@ async function main() {
 
   const spub = await req('GET', `/sellers/${sellerId}`);
   check('E06 public + reputation shape', spub.status === 200 && typeof J(spub).reputation === 'object');
+  const spubRating = J(spub).rating as { average: number | null; count: number } | undefined;
+  check('E06 rating shape {average,count}', !!spubRating && (spubRating.average === null || typeof spubRating.average === 'number') && typeof spubRating.count === 'number', `got ${JSON.stringify(spubRating)}`);
   const dash = await req('GET', '/sellers/me/dashboard', undefined, sellerToken);
   check('E07 dashboard 200', dash.status === 200 && J(dash).reserved_account !== undefined && J(dash).counts_by_status !== undefined);
 
@@ -193,8 +195,12 @@ async function main() {
   const buyerToken = signAccessToken({ sub: buyer.id, role: 'buyer' });
   const crossTable = await req('POST', '/auth/seller/register', { name: 'Cross', email: buyerEmail, password: 'E2EPass123!' });
   check('uniqueness buyer-email seller register 409', crossTable.status === 409, `got ${crossTable.status}`);
-  const patchBuyer = await req('PATCH', '/auth/me', { name: 'x' }, buyerToken);
-  check('A7 buyer forbidden 401', patchBuyer.status === 401, `got ${patchBuyer.status}`);
+  const patchBuyer = await req('PATCH', '/auth/me', { name: 'E2E Buyer Renamed', phone: '+2348012345678' }, buyerToken);
+  check('A8 buyer patch name+phone 200', patchBuyer.status === 200 && J(patchBuyer).role === 'buyer', `got ${patchBuyer.status}`);
+  const meBuyer = await req('GET', '/auth/me', undefined, buyerToken);
+  check('A8 buyer me phone persisted', ((J(meBuyer).profile as { phone?: string } | undefined)?.phone ?? '') === '+2348012345678', `got ${JSON.stringify(J(meBuyer).profile).slice(0, 160)}`);
+  const patchBuyerBiz = await req('PATCH', '/auth/me', { business_name: 'Nope Ltd' }, buyerToken);
+  check('A8 buyer seller field 400', patchBuyerBiz.status === 400, `got ${patchBuyerBiz.status}`);
 
   const oos = await req('POST', '/orders', { product_id: zeroId, delivery_address: '14 Allen Avenue, Ikeja, Lagos' }, buyerToken);
   check('E12 out-of-stock 409', oos.status === 409, `got ${oos.status}`);
@@ -256,6 +262,24 @@ async function main() {
   check('E24 cancel 200', cancel.status === 200 && J(cancel).status === 'Cancelled');
   const cancelPaid = await req('POST', `/orders/${o1.id}/cancel`, undefined, buyerToken);
   check('E24 cancel Completed 409', cancelPaid.status === 409);
+
+  // §1.5 ratings
+  const rateZero = await req('POST', `/orders/${o1.id}/rating`, { stars: 0 }, buyerToken);
+  check('rating stars 0 → 400', rateZero.status === 400, `got ${rateZero.status}`);
+  const rateAnon = await req('POST', `/orders/${o1.id}/rating`, { stars: 5 });
+  check('rating anon → 401', rateAnon.status === 401, `got ${rateAnon.status}`);
+  const rateSeller = await req('POST', `/orders/${o1.id}/rating`, { stars: 5 }, sellerToken);
+  check('rating seller → 403', rateSeller.status === 403, `got ${rateSeller.status}`);
+  const rateOk = await req('POST', `/orders/${o1.id}/rating`, { stars: 5 }, buyerToken);
+  check('rating happy → 201', rateOk.status === 201 && J(rateOk).rating === 5, `got ${rateOk.status} ${JSON.stringify(J(rateOk))}`);
+  const rateDup = await req('POST', `/orders/${o1.id}/rating`, { stars: 4 }, buyerToken);
+  check('rating dup → 409', rateDup.status === 409, `got ${rateDup.status}`);
+  const rateCancelled = await req('POST', `/orders/${o3.id}/rating`, { stars: 5 }, buyerToken);
+  check('rating Cancelled order → 409', rateCancelled.status === 409, `got ${rateCancelled.status}`);
+  const ratedDetail = await req('GET', `/orders/${o1.id}`, undefined, buyerToken);
+  check('order embeds rating 5', J(ratedDetail).rating === 5, `got ${JSON.stringify(J(ratedDetail).rating)}`);
+  const ratedBuyer = J(ratedDetail).buyer as { order_count?: number } | null | undefined;
+  check('order embeds buyer.order_count', typeof ratedBuyer?.order_count === 'number', `got ${JSON.stringify(ratedBuyer)}`);
 
   const o4 = await makeOrder();
   const verify = await req('POST', `/orders/${o4.id}/verify`, undefined, buyerToken);

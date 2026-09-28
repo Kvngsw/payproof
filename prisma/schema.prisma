@@ -65,6 +65,7 @@ model Seller {
 
   products  Product[]
   orders    Order[]
+  ratings   Rating[]
 
   @@index([email])
   @@map("sellers")
@@ -75,11 +76,13 @@ model Seller {
 model Buyer {
   id           String  @id @default(uuid())
   name         String?
+  phone        String? // profile edit (A7 buyer branch): buyers update name+phone
   email        String  @unique
   passwordHash String? // Auth v2 (A5): buyers register with a password now
   createdAt    DateTime @default(now())
 
   orders    Order[]
+  ratings   Rating[]
 
   @@map("buyers")
 }
@@ -158,6 +161,7 @@ model Order {
   payments    Payment[]
   payouts     Payout[]
   orderEvents OrderEvent[]
+  rating      Rating?
 
   @@index([sellerId])
   @@index([buyerId])
@@ -165,6 +169,24 @@ model Order {
   @@index([status])
   @@index([sellerId, status])
   @@map("orders")
+}
+
+// ── Ratings (buyer → seller, one per Completed order) ─────────────────────────
+model Rating {
+  id        String   @id @default(uuid())
+  stars     Int      // 1–5, validated at the API layer
+  createdAt DateTime @default(now())
+  orderId   String   @unique // one rating per order — second POST → 409
+  sellerId  String
+  buyerId   String
+
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  seller Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  buyer  Buyer  @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId])
+  @@index([buyerId])
+  @@map("ratings")
 }
 
 // ── Payments ──────────────────────────────────────────────────────────────────

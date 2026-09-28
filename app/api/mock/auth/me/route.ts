@@ -57,6 +57,55 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   if (isReadOnly()) return readOnlyResponse(READ_ONLY_PROFILE_MESSAGE);
   const user = verifyToken(request.headers.get("authorization"));
+
+  if (user && user.role === "buyer") {
+    // A7 buyer branch: buyers may update name + phone only.
+    let body: Record<string, unknown> = {};
+    try {
+      body = await request.json();
+    } catch {}
+
+    if ("business_name" in body || "bvn" in body || "settlement" in body) {
+      return NextResponse.json(
+        { error: { code: "VALIDATION", message: "Buyers can only update name and phone" } },
+        { status: 400 },
+      );
+    }
+
+    const patch: Record<string, unknown> = {};
+    if ("name" in body) {
+      const name = String(body.name ?? "").trim();
+      if (!name) {
+        return NextResponse.json(
+          { error: { code: "VALIDATION", message: "Name cannot be empty" } },
+          { status: 400 },
+        );
+      }
+      patch.name = name;
+    }
+    if ("phone" in body) patch.phone = String(body.phone ?? "").trim();
+
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json(
+        { error: { code: "VALIDATION", message: "No fields to update" } },
+        { status: 400 },
+      );
+    }
+
+    const updated = db.buyers.update(user.sub, patch);
+    if (!updated) {
+      return NextResponse.json(
+        { error: { code: "NOT_FOUND", message: "Buyer not found" } },
+        { status: 404 },
+      );
+    }
+
+    const row = db.buyers.findById(user.sub) ?? {};
+    const profile = { ...row };
+    delete profile.password_hash;
+    return NextResponse.json({ role: "buyer", profile });
+  }
+
   if (!user || user.role !== "seller") {
     return NextResponse.json(
       { error: { code: "UNAUTHENTICATED", message: "Seller token required" } },

@@ -25,9 +25,11 @@ export async function GET(request: NextRequest, { params }: Params) {
       include: {
         product: { select: { id: true, name: true, imageUrl: true } },
         seller: { select: { id: true, businessName: true } },
+        buyer: { select: { name: true, email: true, createdAt: true } },
         payments: { orderBy: { createdAt: 'desc' }, take: 1 },
         payouts: true,
         orderEvents: { orderBy: { createdAt: 'asc' } },
+        rating: { select: { stars: true } },
       },
     });
 
@@ -37,6 +39,10 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     const reputation = await getReputation(order.sellerId);
     const payment = order.payments[0];
+
+    const buyerOrderCount = order.buyerId
+      ? await db.order.count({ where: { buyerId: order.buyerId } })
+      : 0;
 
     const payoutStatus =
       order.payouts.length === 0
@@ -50,12 +56,21 @@ export async function GET(request: NextRequest, { params }: Params) {
     return ok({
       id: order.id,
       status: order.status,
+      rating: order.rating?.stars ?? null,
       product: order.product,
       seller: {
         id: order.seller.id,
         business_name: order.seller.businessName,
         reputation,
       },
+      buyer: order.buyer
+        ? {
+            name: order.buyer.name ?? order.buyer.email,
+            email: order.buyer.email,
+            created_at: order.buyer.createdAt,
+            order_count: buyerOrderCount,
+          }
+        : null,
       amounts: {
         product_kobo: order.productPriceKobo,
         dispatch_fee_kobo: order.dispatchFeeKobo,
