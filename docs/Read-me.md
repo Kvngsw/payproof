@@ -10,9 +10,9 @@ Escrow-style payment protection for informal/social commerce sellers and buyers,
 
 | | URL |
 |---|---|
-| Web app | https://payproof-seven.vercel.app |
-| Repo | https://github.com/Kvngsw/payproof (public) |
-| API | **[NEEDS INPUT — BLOCKING, CONFIRMED NOT LIVE]**  |
+| Web app | `https://payproof-seven.vercel.app` |
+| Repo | `https://github.com/Kvngsw/payproof` (public) |
+| API | `https://payproof-seven.vercel.app`  |
 | Demo video (backup) | [NEEDS INPUT — not recorded yet, PM-13] |
 
 ---
@@ -34,12 +34,12 @@ docker compose up      # or: npm install && npm run dev, per apps/api and apps/w
 | `JWT_SECRET` | api | — |
 | `MONNIFY_API_KEY` / `MONNIFY_SECRET_KEY` / `MONNIFY_CONTRACT_CODE` / `MONNIFY_BASE_URL` | api | Monnify sandbox (`sandbox.monnify.com`) |
 | `MONNIFY_WALLET_ACCOUNT_NUMBER` | api | Sandbox wallet used for outbound transfers |
-| `LOGISTICS_BANK_CODE` / `LOGISTICS_ACCOUNT_NUMBER` / `LOGISTICS_ACCOUNT_NAME` | api | **UNFILLED — blocking the dispatch-fee split (D6). Fill before payout testing is possible.** |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | api | Live OTP email delivery (SMTP + nodemailer). Unset → live OTP returns 500; mock/demo mode is unaffected (shows the code in the card banner). |
-| `GEMINI_API_KEY` | api | Gemini 2.5 Flash, powers the order-scoped AI assistant |
+| `LOGISTICS_BANK_CODE` / `LOGISTICS_ACCOUNT_NUMBER` / `LOGISTICS_ACCOUNT_NAME` | api | **Still unfilled with a real logistics partner.** Interim fix per D6: use Richard's own bank details as the sandbox recipient to exercise the transfer path end-to-end today. If not filled by demo time, `HELD` is a disclosed, honest fallback state — not a failure. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | api | Live OTP email delivery (SMTP + nodemailer). |
+| `GEMINI_API_KEY` | api | Gemini 3.8 Flash, powers the order-scoped AI assistant |
 | `DEMO_FALLBACK` | api | Currently `false` — cached-webhook fallback (E15) is off. Consider `true` until the public webhook URL is proven working. |
-| `NEXT_PUBLIC_APP_URL` | web | Currently `http://localhost:3000` — **needs to become the real deployed URL before webhooks or the deployed demo can work.** |
-| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | api | Was blank (in-memory only, unsafe on serverless); repo activity shows a cross-process Upstash proof script in progress — **[NEEDS INPUT]** confirm with Richard whether this is finished and wired in, or still WIP. |
+| `NEXT_PUBLIC_APP_URL` | web | Currently `https://payproof-seven.vercel.app` |
+| `UPSTASH_REDIS_REST_URL` / `_TOKEN` | api | `https://happy-stork-303744.upstash.io` (in-memory only, unsafe on serverless)
 
 
 ---
@@ -76,7 +76,7 @@ Be upfront about this on stage — judges find it faster than you'd like.
 
 | Claim | Real? |
 |---|---|
-| Seller reserved account | **[NEEDS INPUT]** — real Monnify sandbox call, or a manually created wallet? |
+| Seller reserved account | **LIVE** — real Monnify sandbox call|
 | Payment verification | Server-side `verifyTransaction()` call against Monnify, not just trusting the webhook body — **[NEEDS INPUT: confirm this is how Richard built E16]** |
 | Dispatch-fee split | **NOT YET REAL.** Logistics beneficiary details are still placeholders in the env — the second transfer has not been attempted. Do not claim this live until D6 is unblocked. |
 | Delivery tracking | Manually updated by seller, not pulled from a courier API. Labelled "Manually updated by seller" in the UI. |
@@ -102,6 +102,7 @@ Sign-up: `/signup` → buyer (single form) or seller (single form, name/email/pa
 
 *(Fill in as things get cut — do this continuously, not at the end.)*
 
+- [ ] Invoices — frontend flow built and working against a local mock; backend endpoints (`/invoices`, see api-requests.md S1.1) not yet confirmed live. Ruled in scope 2026-09-27 (decision-log D19b) — confirm build status with Richard. 
 - [ ] **[NEEDS INPUT]** — buyer reviews (parked, spec item 19)
 - [ ] **[NEEDS INPUT]** — courier-API tracking via Shipbubble sandbox (2h time-boxed stretch, spec item 20). If attempted and it works, this line comes out; if dropped or it fails, tracking stays manual with the "Manually updated by seller" label — that's the spec's own default, not a shortfall. See decision-log D18 for why Shipbubble specifically and not the other named providers.
 - [ ] Disputed orders have no resolution flow in this MVP — payout stays frozen permanently
@@ -112,7 +113,10 @@ Sign-up: `/signup` → buyer (single form) or seller (single form, name/email/pa
 
 ## Testing
 
-- Automated: **[NEEDS INPUT]** — has QA-02 (state machine + payout-split unit tests) been written? Not confirmed in the progress update.
+## Testing
+
+- Automated: **reported live in CI** (`npx vitest run` in `.github/workflows/ci.yml`, per QA channel update) — **not yet independently verified** that the specific invariant assertions (state-machine transition guards, `sellerKobo + logisticsKobo === order.total_kobo`) are actually among the passing tests, versus a test runner existing with lighter coverage. Confirm by reading the suite before checking QA-02 off.
+- Repo hygiene: PR template, gitleaks CI scan, and a locked `.gitignore` **confirmed** (OPS-01, per QA channel update) 
 - Manual smoke path: seller register → product listed → checkout → sandbox pay → webhook → ship → confirm delivery → payout → dispute path.
 
 ---
@@ -122,5 +126,5 @@ Sign-up: `/signup` → buyer (single form) or seller (single form, name/email/pa
 | Role | Person |
 |---|---|
 | Backend lead | hiamrhex |
-| Frontend lead | xpektra |
+| Frontend lead | xpektra7 |
 | PM / pitch/ integration+QA | kvngsw |
