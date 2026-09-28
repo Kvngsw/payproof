@@ -1,0 +1,181 @@
+{
+  "info": {
+    "name": "PayProof 2.0 API v1",
+    "_postman_id": "payproof-v1-collection",
+    "description": "Runnable Postman collection for PayProof 2.0 (Live Staging/Prod). Target: https://payproof-seven.vercel.app/api/v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://payproof-seven.vercel.app/api/v1", "type": "string" },
+    { "key": "sellerToken", "value": "", "type": "string" },
+    { "key": "buyerToken", "value": "", "type": "string" },
+    { "key": "orderId", "value": "", "type": "string" },
+    { "key": "productId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "00 - System Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+      }
+    },
+    {
+      "name": "01 - Auth / Seller Register",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Ada Lovelace\",\n  \"email\": \"ada@kicks.com\",\n  \"password\": \"demo1234\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/auth/seller/register", "host": ["{{baseUrl}}"], "path": ["auth", "seller", "register"] }
+      }
+    },
+    {
+      "name": "02 - Auth / Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"ada@kicks.com\",\n  \"password\": \"demo1234\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+      }
+    },
+    {
+      "name": "03 - Auth / Verify OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.token) { pm.collectionVariables.set('sellerToken', jsonData.token); }"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"ada@kicks.com\",\n  \"code\": \"123456\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/auth/otp/verify", "host": ["{{baseUrl}}"], "path": ["auth", "otp", "verify"] }
+      }
+    },
+    {
+      "name": "04 - Products / List Products",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
+        "url": { "raw": "{{baseUrl}}/products", "host": ["{{baseUrl}}"], "path": ["products"] }
+      }
+    },
+    {
+      "name": "05 - Products / Create Product (D20 Defaults)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.id) { pm.collectionVariables.set('productId', jsonData.id); }"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Air Runner Sneakers\",\n  \"price_kobo\": 4500000,\n  \"description\": \"Original running sneakers with reinforced sole.\",\n  \"stock_quantity\": 10,\n  \"dispatch_fee_kobo\": 250000,\n  \"delivery_days\": 3\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/products", "host": ["{{baseUrl}}"], "path": ["products"] }
+      }
+    },
+    {
+      "name": "06 - Orders / Create Order",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.order && jsonData.order.id) { pm.collectionVariables.set('orderId', jsonData.order.id); }"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{buyerToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"product_id\": \"{{productId}}\",\n  \"delivery_address\": \"14 Broad Street, Marina, Lagos\",\n  \"phone\": \"08012345678\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
+      }
+    },
+    {
+      "name": "07 - Orders / Get Order Details (Polling Target)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{buyerToken}}" }],
+        "url": { "raw": "{{baseUrl}}/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["orders", "{{orderId}}"] }
+      }
+    },
+    {
+      "name": "08 - Orders / Mark as Shipped (E17)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tracking_number\": \"TRK-892301\",\n  \"carrier\": \"Manual Courier\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/orders/{{orderId}}/ship", "host": ["{{baseUrl}}"], "path": ["orders", "{{orderId}}", "ship"] }
+      }
+    },
+    {
+      "name": "09 - Orders / Confirm Delivery (E19 - Triggers Payout)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{buyerToken}}" }],
+        "url": { "raw": "{{baseUrl}}/orders/{{orderId}}/confirm-delivery", "host": ["{{baseUrl}}"], "path": ["orders", "{{orderId}}", "confirm-delivery"] }
+      }
+    },
+    {
+      "name": "10 - Orders / Report Issue (E20 - Freezes Payout)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{buyerToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Item delivered was defective and size did not match description.\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/orders/{{orderId}}/report-issue", "host": ["{{baseUrl}}"], "path": ["orders", "{{orderId}}", "report-issue"] }
+      }
+    }
+  ]
+}
