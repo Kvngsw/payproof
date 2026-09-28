@@ -2,180 +2,1712 @@
   "info": {
     "name": "PayProof 2.0 API v1",
     "_postman_id": "payproof-v1-collection",
-    "description": "Runnable Postman collection for PayProof 2.0 (Live Staging/Prod). Target: https://payproof-seven.vercel.app/api/v1",
+    "description": "Contract-driven collection for PayProof 2.0 (docs/api-contract.md, E01-E24 + pending E25-E28). Run folders in order 00-08. Tests double as contract-drift detectors: a failing assertion means live behaviour differs from the frozen contract - log it, do not silently edit the test. Manual step: pay the checkout URL (console) in the Monnify sandbox between E12 and E14/E15.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "https://payproof-seven.vercel.app/api/v1", "type": "string" },
-    { "key": "sellerToken", "value": "", "type": "string" },
-    { "key": "buyerToken", "value": "", "type": "string" },
-    { "key": "orderId", "value": "", "type": "string" },
-    { "key": "productId", "value": "", "type": "string" }
+    {
+      "key": "baseUrl",
+      "value": "https://payproof-seven.vercel.app/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "hostUrl",
+      "value": "https://payproof-seven.vercel.app",
+      "type": "string"
+    },
+    {
+      "key": "sellerEmail",
+      "value": "ada@payproof.ng",
+      "type": "string"
+    },
+    {
+      "key": "sellerPassword",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "buyerEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "otpCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sellerToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "buyerToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sellerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "checkoutUrl",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "invoiceId",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
     {
-      "name": "00 - System Health",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
-      }
-    },
-    {
-      "name": "01 - Auth / Seller Register",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"name\": \"Ada Lovelace\",\n  \"email\": \"ada@kicks.com\",\n  \"password\": \"demo1234\"\n}"
-        },
-        "url": { "raw": "{{baseUrl}}/auth/seller/register", "host": ["{{baseUrl}}"], "path": ["auth", "seller", "register"] }
-      }
-    },
-    {
-      "name": "02 - Auth / Login",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"ada@kicks.com\",\n  \"password\": \"demo1234\"\n}"
-        },
-        "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
-      }
-    },
-    {
-      "name": "03 - Auth / Verify OTP",
-      "event": [
+      "name": "00 Health",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "var jsonData = pm.response.json();",
-              "if (jsonData.token) { pm.collectionVariables.set('sellerToken', jsonData.token); }"
-            ],
-            "type": "text/javascript"
-          }
+          "name": "E23 GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Contract E23. Rail should read monnify (D12)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"ok true\", () => pm.expect(b.ok).to.eql(true));",
+                  "console.log(\"rail reported:\", b.rail); // contract text still says paystack until docs PR lands; should be monnify"
+                ]
+              }
+            }
+          ]
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"ada@kicks.com\",\n  \"code\": \"123456\"\n}"
-        },
-        "url": { "raw": "{{baseUrl}}/auth/otp/verify", "host": ["{{baseUrl}}"], "path": ["auth", "otp", "verify"] }
-      }
+      ]
     },
     {
-      "name": "04 - Products / List Products",
-      "request": {
-        "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{sellerToken}}" }],
-        "url": { "raw": "{{baseUrl}}/products", "host": ["{{baseUrl}}"], "path": ["products"] }
-      }
-    },
-    {
-      "name": "05 - Products / Create Product (D20 Defaults)",
-      "event": [
+      "name": "01 Seller auth",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "var jsonData = pm.response.json();",
-              "if (jsonData.id) { pm.collectionVariables.set('productId', jsonData.id); }"
+          "name": "E01 POST /auth/seller/register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"name\": \"Air Runner Sneakers\",\n  \"price_kobo\": 4500000,\n  \"description\": \"Original running sneakers with reinforced sole.\",\n  \"stock_quantity\": 10,\n  \"dispatch_fee_kobo\": 250000,\n  \"delivery_days\": 3\n}"
+            "url": {
+              "raw": "{{baseUrl}}/auth/seller/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "seller",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA Seller\",\n  \"email\": \"qa+{{$timestamp}}@example.com\",\n  \"password\": \"Demo12345!\",\n  \"phone\": \"08012345678\",\n  \"business_name\": \"QA Kicks\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Creates a real Monnify sandbox reserved account. Creates a new seller each run - do not spam. Contract E01. NOTE: live FE also sends bvn + settlement (api-requests V5)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"reserved account returned\", () => pm.expect(b.reserved_account && b.reserved_account.account_number).to.be.ok);",
+                  "pm.test(\"token returned\", () => pm.expect(b.token).to.be.ok);"
+                ]
+              }
+            }
+          ]
         },
-        "url": { "raw": "{{baseUrl}}/products", "host": ["{{baseUrl}}"], "path": ["products"] }
-      }
-    },
-    {
-      "name": "06 - Orders / Create Order",
-      "event": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "var jsonData = pm.response.json();",
-              "if (jsonData.order && jsonData.order.id) { pm.collectionVariables.set('orderId', jsonData.order.id); }"
+          "name": "E02 POST /auth/seller/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "type": "text/javascript"
-          }
+            "url": {
+              "raw": "{{baseUrl}}/auth/seller/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "seller",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{sellerEmail}}\",\n  \"password\": \"{{sellerPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Set collection variables sellerEmail / sellerPassword first (seeded live sellers: ada@payproof.ng, emeka@payproof.ng). If this 404s the live route differs from contract - log it as contract drift."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"token\", () => pm.expect(b.token).to.be.ok);",
+                  "if (b.token) { pm.collectionVariables.set(\"sellerToken\", b.token); }",
+                  "if (b.seller && b.seller.id) { pm.collectionVariables.set(\"sellerId\", b.seller.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E05 GET /auth/me (seller)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "api-requests R5: reserved_account should be top-level. Log shows where it actually is."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "console.log(\"role:\", b.role, \"| reserved_account present:\", !!(b.reserved_account || (b.profile && b.profile.reserved_account)));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E07 GET /sellers/me/dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sellers/me/dashboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sellers",
+                "me",
+                "dashboard"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "api-requests R6: status keys may be camelCase vs spaced."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "console.log(\"counts_by_status:\", JSON.stringify(b.counts_by_status));"
+                ]
+              }
+            }
+          ]
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{buyerToken}}" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"product_id\": \"{{productId}}\",\n  \"delivery_address\": \"14 Broad Street, Marina, Lagos\",\n  \"phone\": \"08012345678\"\n}"
+      ]
+    },
+    {
+      "name": "02 Buyer auth",
+      "item": [
+        {
+          "name": "E03 POST /auth/buyer/otp/request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/buyer/otp/request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "buyer",
+                "otp",
+                "request"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{buyerEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "D19: live mode emails the code (needs SMTP_* env on Vercel). dev_code only appears in demo/mock mode."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 202\", () => pm.response.to.have.status(202));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"sent\", () => pm.expect(b.sent).to.eql(true));",
+                  "if (b.dev_code) { pm.collectionVariables.set(\"otpCode\", b.dev_code); console.log(\"dev_code captured\"); } else { console.log(\"No dev_code (live SMTP mode) - read code from email and set otpCode manually\"); }"
+                ]
+              }
+            }
+          ]
         },
-        "url": { "raw": "{{baseUrl}}/orders", "host": ["{{baseUrl}}"], "path": ["orders"] }
-      }
+        {
+          "name": "E04 POST /auth/buyer/otp/verify",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/buyer/otp/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "buyer",
+                "otp",
+                "verify"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{buyerEmail}}\",\n  \"code\": \"{{otpCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"token\", () => pm.expect(b.token).to.be.ok);",
+                  "if (b.token) { pm.collectionVariables.set(\"buyerToken\", b.token); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     },
     {
-      "name": "07 - Orders / Get Order Details (Polling Target)",
-      "request": {
-        "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{buyerToken}}" }],
-        "url": { "raw": "{{baseUrl}}/orders/{{orderId}}", "host": ["{{baseUrl}}"], "path": ["orders", "{{orderId}}"] }
-      }
-    },
-    {
-      "name": "08 - Orders / Mark as Shipped (E17)",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{sellerToken}}" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"tracking_number\": \"TRK-892301\",\n  \"carrier\": \"Manual Courier\"\n}"
+      "name": "03 Catalog",
+      "item": [
+        {
+          "name": "E08 GET /products?seller_id=",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?seller_id={{sellerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "seller_id",
+                  "value": "{{sellerId}}"
+                }
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Public per contract, scoped by seller_id. Storefront /s/[sellerId] depends on this staying public."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"is array\", () => pm.expect(Array.isArray(b)).to.eql(true));",
+                  "if (Array.isArray(b) && b.length) { pm.collectionVariables.set(\"productId\", b[0].id); }"
+                ]
+              }
+            }
+          ]
         },
-        "url": { "raw": "{{baseUrl}}/orders/{{orderId}}/ship", "host": ["{{baseUrl}}"], "path": ["orders", "{{orderId}}", "ship"] }
-      }
-    },
-    {
-      "name": "09 - Orders / Confirm Delivery (E19 - Triggers Payout)",
-      "request": {
-        "method": "POST",
-        "header": [{ "key": "Authorization", "value": "Bearer {{buyerToken}}" }],
-        "url": { "raw": "{{baseUrl}}/orders/{{orderId}}/confirm-delivery", "host": ["{{baseUrl}}"], "path": ["orders", "{{orderId}}", "confirm-delivery"] }
-      }
-    },
-    {
-      "name": "10 - Orders / Report Issue (E20 - Freezes Payout)",
-      "request": {
-        "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{buyerToken}}" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"reason\": \"Item delivered was defective and size did not match description.\"\n}"
+        {
+          "name": "E10 POST /products (explicit values)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA Sneakers\",\n  \"price_kobo\": 4500000,\n  \"description\": \"Original running sneakers with reinforced sole.\",\n  \"image_url\": \"\",\n  \"stock_quantity\": 10,\n  \"dispatch_fee_kobo\": 250000,\n  \"delivery_days\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "if (b.id) { pm.collectionVariables.set(\"productId\", b.id); }"
+                ]
+              }
+            }
+          ]
         },
-        "url": { "raw": "{{baseUrl}}/orders/{{orderId}}/report-issue", "host": ["{{baseUrl}}"], "path": ["orders", "{{orderId}}", "report-issue"] }
-      }
+        {
+          "name": "E10b POST /products (D20 defaults - fields omitted)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"QA Default Fee Item\",\n  \"price_kobo\": 2000000,\n  \"description\": \"Tests D20 platform defaults.\",\n  \"stock_quantity\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "D20: omitted or 0 -> platform default 250000 kobo / 3 days. If response is camelCase this fails - that is api-requests V4/W4 drift, report it."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"D20 default dispatch fee = 250000 kobo\", () => pm.expect(b.dispatch_fee_kobo).to.eql(250000));",
+                  "pm.test(\"D20 default delivery_days = 3\", () => pm.expect(b.delivery_days).to.eql(3));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E09 GET /products/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E11 PATCH /products/:id (owner)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock_quantity\": 12\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"stock updated (snake_case accepted - api-requests V4)\", () => pm.expect(b.stock_quantity).to.eql(12));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Money in (order -> pay -> paid)",
+      "item": [
+        {
+          "name": "E12 POST /orders (buyer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{productId}}\",\n  \"delivery_address\": \"14 Broad Street, Marina, Lagos\",\n  \"phone\": \"08012345678\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "MANUAL STEP FOLLOWS: open {{checkoutUrl}} (see console) and complete the sandbox transfer. Postman cannot pay."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 201\", () => pm.response.to.have.status(201));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "if (b.order && b.order.id) { pm.collectionVariables.set(\"orderId\", b.order.id); }",
+                  "if (b.payment && b.payment.checkout_url) { pm.collectionVariables.set(\"checkoutUrl\", b.payment.checkout_url); console.log(\"MANUAL STEP - open and pay in Monnify sandbox:\", b.payment.checkout_url); }",
+                  "pm.test(\"total = product + dispatch\", () => { if (b.order && b.order.amounts) pm.expect(b.order.amounts.total_kobo).to.eql(b.order.amounts.product_kobo + b.order.amounts.dispatch_fee_kobo); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E14 GET /orders/:id (polling target)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "console.log(\"status:\", b.status, \"| verification_mode:\", b.payment && b.payment.verification_mode);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E15 POST /orders/:id/verify (buyer)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "verify"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Live server-side verify. With DEMO_FALLBACK=true and rail timeout, verification_mode becomes cached_fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "console.log(\"status after live verify:\", b.order && b.order.status);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E13 GET /orders?status= (buyer)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 Fulfilment + payout",
+      "item": [
+        {
+          "name": "E17 POST /orders/:id/ship (seller)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/ship",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "ship"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tracking_number\": \"TRK-892301\",\n  \"carrier\": \"Manual Courier\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Requires order status Awaiting Shipment (i.e. paid). Expect Shipped."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"returns full order (api-requests R2)\", () => pm.expect(b.order && b.order.status).to.be.ok);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E18 PATCH /orders/:id/tracking (seller)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/tracking",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "tracking"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tracking_status\": \"In Transit\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"tracking.source manual + label\", () => { if (b.order && b.order.tracking) pm.expect(b.order.tracking.source).to.eql(\"manual\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E19 POST /orders/:id/confirm-delivery (buyer) - fires payout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/confirm-delivery",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "confirm-delivery"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Triggers TWO transfers (seller = product price, logistics = dispatch fee). Sandbox wallet balance must cover both."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"Completed\", () => pm.expect(b.order && b.order.status).to.eql(\"Completed\"));",
+                  "console.log(\"payout:\", JSON.stringify(b.payout));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E21 GET /orders/:id/payout",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/payout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "payout"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"invariant: transfers sum == product + dispatch\", () => { if (Array.isArray(b.transfers) && b.transfers.length === 2) pm.expect(b.transfers[0].amount_kobo + b.transfers[1].amount_kobo).to.eql(b.product_kobo + b.dispatch_kobo); });",
+                  "console.log(\"payout status:\", b.status, JSON.stringify(b.transfers));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 Dispute path (use a SECOND order in Shipped)",
+      "item": [
+        {
+          "name": "E20 POST /orders/:id/report-issue (buyer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/report-issue",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "report-issue"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Item delivered was defective and size did not match description.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Set orderId to an order in Shipped/Delivered. Payout must freeze."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"Disputed\", () => pm.expect(b.order && b.order.status).to.eql(\"Disputed\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E21b GET payout after dispute",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/payout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "payout"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"payout frozen\", () => pm.expect(b.status).to.eql(\"frozen\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 Read models + assistant + cancel",
+      "item": [
+        {
+          "name": "E06 GET /sellers/:id (public reputation)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sellers/{{sellerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sellers",
+                "{{sellerId}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Run before/after the order lifecycle to verify D4: in-flight orders must NOT change completed/total."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "console.log(\"reputation:\", JSON.stringify(b.reputation));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E22 POST /orders/:id/assistant",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "assistant"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What is the status of my order?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"scope order\", () => pm.expect(b.scope).to.eql(\"order\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E22b assistant off-scope (expect verbatim refusal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/assistant",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "assistant"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What other products does this seller sell?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"verbatim refusal\", () => pm.expect(b.answer).to.include(\"I can only answer questions about this specific order.\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E24 POST /orders/:id/cancel (buyer) - only Pending Payment",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "cancel"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Do not run on your demo order."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "console.log(\"cancel result status code:\", pm.response.code, \"- WARNING: cancelled orders count against seller reputation (D4/D21)\");"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 Guards / negative tests (each must fail correctly)",
+      "item": [
+        {
+          "name": "N1 Unscoped GET /products, no auth, no seller_id (R7 regression)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "BUG-01 / R7. Passing = fixed. Failing = every seller's inventory is still public."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"must NOT return all tenants (expect 400/401)\", () => pm.expect([400, 401]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N2 Buyer PATCH product -> 403",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock_quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"403 FORBIDDEN\", () => pm.expect([401, 403]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "N3 confirm-delivery on unpaid order -> 409",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/confirm-delivery",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "orders",
+                "{{orderId}}",
+                "confirm-delivery"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{buyerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Point orderId at a Pending Payment order first."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"409 INVALID_TRANSITION (run against a Pending Payment order)\", () => pm.expect(pm.response.code).to.eql(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E16 N4 Webhook with bad signature -> 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "monnify-signature",
+                "value": "deadbeef"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{hostUrl}}/api/monnify/webhook",
+              "host": [
+                "{{hostUrl}}"
+              ],
+              "path": [
+                "api",
+                "monnify",
+                "webhook"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventType\": \"SUCCESSFUL_TRANSACTION\",\n  \"eventData\": {\n    \"paymentReference\": \"forged\",\n    \"amountPaid\": 1,\n    \"paymentStatus\": \"PAID\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "E16. Proves signature is enforced. A valid-signature webhook cannot be produced from Postman (needs the secret). Header name is Monnify's documented signature header - verify against handler."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"401 BAD_SIGNATURE\", () => pm.expect(pm.response.code).to.eql(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "09 PENDING - Invoices + DELETE (BE-15 / INT-02). Expected to fail until shipped",
+      "item": [
+        {
+          "name": "E25 POST /invoices (seller)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/invoices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"INV-89D517\",\n  \"items\": [\n    {\n      \"product_id\": \"{{productId}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"customer_name\": \"Ada Lovelace\",\n  \"customer_contact\": \"ada@example.com\",\n  \"note\": \"Optional note\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "api-requests 1.1. Quantity 1 / single item per proposed live-mode rule (D7)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"201\", () => pm.expect(pm.response.code).to.eql(201));",
+                  "if (b.id) { pm.collectionVariables.set(\"invoiceId\", b.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E26 GET /invoices (seller)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/invoices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E27 GET /invoices/:id (PUBLIC)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices",
+                "{{invoiceId}}"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));",
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"embeds seller.business_name\", () => pm.expect(b.seller && b.seller.business_name).to.be.ok);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E28 POST /invoices/:id/cancel (seller)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/invoices/{{invoiceId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "invoices",
+                "{{invoiceId}}",
+                "cancel"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"status is 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E11b DELETE /products/:id (owner)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "{{productId}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{sellerToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Do not run against the product used for your demo orders."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let b = {}; try { b = pm.response.json(); } catch (e) {}",
+                  "pm.test(\"200 ok or 409 PRODUCT_HAS_ORDERS\", () => pm.expect([200, 409]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }
