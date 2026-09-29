@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { authenticate, getRequestId } from '@/lib/auth';
+import { displayStatus } from '@/lib/order-view';
 import { ok, unauthorized, forbidden, handleError } from '@/lib/api-response';
 
 export const dynamic = 'force-dynamic';
@@ -33,8 +34,10 @@ export async function GET(request: NextRequest) {
     });
 
     const countsByStatus: Record<string, number> = {};
+    const countsByDisplayStatus: Record<string, number> = {};
     for (const row of counts) {
       countsByStatus[row.status] = row._count.status;
+      countsByDisplayStatus[displayStatus(row.status)] = row._count.status;
     }
 
     const payoutSums = await db.payout.groupBy({
@@ -62,6 +65,7 @@ export async function GET(request: NextRequest) {
           }
         : null,
       counts_by_status: countsByStatus,
+      counts_by_display_status: countsByDisplayStatus,
       payouts: {
         pending_kobo: pendingKobo,
         paid_kobo: paidKobo,
