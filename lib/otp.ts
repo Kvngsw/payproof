@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import db from '@/lib/db';
-import { sendOtp } from '@/lib/email';
+import { sendOtp, type OtpDeliveryResult } from '@/lib/email';
 
 const OTP_EXPIRY_MINUTES = 10;
 const OTP_BCRYPT_ROUNDS = 10; // lower cost: codes die in 10min, UX beats theoretical strength
@@ -12,7 +12,7 @@ const OTP_BCRYPT_ROUNDS = 10; // lower cost: codes die in 10min, UX beats theore
 // user can retry once email delivery works.
 export async function issueAndSendOtp(
   email: string,
-): Promise<{ delivery: 'email' }> {
+): Promise<OtpDeliveryResult> {
   const code = String(crypto.randomInt(100_000, 999_999)); // crypto-secure: Math.random is predictable
   const codeHash = await bcrypt.hash(code, OTP_BCRYPT_ROUNDS);
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60_000);

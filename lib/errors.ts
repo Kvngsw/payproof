@@ -8,6 +8,7 @@ export type ErrorCode =
   | 'DUPLICATE'
   | 'PRODUCT_HAS_ORDERS'
   | 'PAYOUT_FROZEN'
+  | 'NO_SETTLEMENT'
   | 'BAD_SIGNATURE'
   | 'RATE_LIMITED'
   | 'RAIL_ERROR'
@@ -88,6 +89,17 @@ export class PayoutFrozenError extends AppError {
     super(
       'PAYOUT_FROZEN',
       `Payout for order ${orderId} is frozen due to a dispute.`,
+      409,
+      { orderId },
+    );
+  }
+}
+
+export class NoSettlementError extends AppError {
+  constructor(orderId: string) {
+    super(
+      'NO_SETTLEMENT',
+      `Seller has no settlement account for order ${orderId}. Add one before releasing payout.`,
       409,
       { orderId },
     );

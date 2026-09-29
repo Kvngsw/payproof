@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Auth v2 (A6): just an OTP row keyed by email — role-agnostic resend for
     // both roles. No buyer auto-create here (that died with A3); the verify
     // step resolves whichever account owns the email.
-    const { delivery } = await issueAndSendOtp(cleanEmail);
+    const { delivery, devCode } = await issueAndSendOtp(cleanEmail);
 
     logger.info('OTP requested', {
       email:    cleanEmail,
@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
       {
         sent:     true,
         delivery,
+        ...(devCode !== undefined && { dev_code: devCode }),
       },
       { status: 202 },
     );

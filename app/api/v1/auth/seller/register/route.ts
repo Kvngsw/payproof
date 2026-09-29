@@ -7,6 +7,7 @@ import { logger }           from '@/lib/logger';
 import { checkRateLimit, clientIp } from '@/lib/rate-limit';
 import { getRequestId } from '@/lib/auth';
 import { issueAndSendOtp } from '@/lib/otp';
+import type { DeliveryMode } from '@/lib/email';
 import { createReservedAccount, validateBankAccount } from '@/lib/monnify';
 import { ok, badRequest, handleError, tooManyRequestsResponse, conflict } from '@/lib/api-response';
 
@@ -150,7 +151,7 @@ export async function POST(request: NextRequest) {
     // Auth v2 (A4): no token at register — OTP verification at /auth/otp/verify
     // signs them in. Roll the seller back if email delivery fails so a retry
     // works once SMTP is configured.
-    let delivery: 'email';
+    let delivery: DeliveryMode;
     try {
       ({ delivery } = await issueAndSendOtp(cleanEmail));
     } catch (otpErr) {

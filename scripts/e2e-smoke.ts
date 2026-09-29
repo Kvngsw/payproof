@@ -36,6 +36,7 @@ async function req(method: string, path: string, body?: unknown, token?: string,
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (cookie) headers['Cookie'] = cookie;
+  headers['X-Forwarded-For'] = `e2e-${TS}`; // unique client identity per run: shared-IP budgets must not bleed across runs
   const r = await fetch(BASE + path, {
     method,
     headers,
@@ -116,6 +117,7 @@ async function main() {
 
   const me = await req('GET', '/auth/me', undefined, sellerToken);
   check('E05 me 200 seller', me.status === 200 && J(me).role === 'seller');
+  check('R5 top-level reserved_account + snake profile', J(me).reserved_account !== undefined && (J(me).profile as { business_name?: string }).business_name !== undefined);
   check('E05 me leaks no secrets', JSON.stringify(J(me)).includes('passwordHash') === false);
   const meAnon = await req('GET', '/auth/me');
   check('E05 me anon 401', meAnon.status === 401);
@@ -176,18 +178,25 @@ async function main() {
   const patch = await req('PATCH', `/products/${prodId}`, { priceKobo: 1200000 }, sellerToken);
   check('E11 owner patch 200', patch.status === 200 && J(patch).priceKobo === 1200000);
 
-  const all = await req('GET', '/products');
+  const all = await req('GET', '/products', undefined, sellerToken);
   const foreign = (J(all) as unknown as Array<{ id: string; seller?: { id: string } }>).find(
     (p) => p.seller?.id && p.seller.id !== sellerId,
   );
   if (foreign) {
     const patchForeign = await req('PATCH', `/products/${foreign.id}`, { priceKobo: 1 }, sellerToken);
-    check('E11 non-owner 403', patchForeign.status === 403, `got ${patchForeign.status}`);
+    check('E11 non-owner 404', patchForeign.status === 404, `got ${patchForeign.status}`);
   } else {
     check('E11 non-owner 403', false, 'no foreign product found');
   }
   const anonCreate = await req('POST', '/products', { name: 'x' });
   check('E10 anon 401', anonCreate.status === 401);
+  const anonList = await req('GET', '/products');
+  check('R7 anon list 401', anonList.status === 401);
+
+  const del = await req('DELETE', `/products/${zeroId}`, undefined, sellerToken);
+  check('DELETE owner 200', del.status === 200);
+  const delGone = await req('GET', `/products/${zeroId}`, undefined, sellerToken);
+  check('DELETE gone 404', delGone.status === 404);
 
   const spub = await req('GET', `/sellers/${sellerId}`);
   check('E06 public + reputation shape', spub.status === 200 && typeof J(spub).reputation === 'object');
@@ -198,15 +207,25 @@ async function main() {
 
   const buyerEmail = `e2ebuyer${TS}@payproof.ng`;
   const otpReq = await req('POST', '/auth/buyer/otp/request', { email: buyerEmail });
-  check('E03 otp accepted, no dev_code leak', otpReq.status === 202 && J(otpReq).dev_code === undefined, `got ${otpReq.status}`);
+  const dlv = J(otpReq).delivery;
+  const hasCode = typeof J(otpReq).dev_code === 'string';
+  check('E03 otp 202 + honest delivery', otpReq.status === 202 && ((dlv === 'dev_screen' && hasCode) || (dlv === 'email' && !hasCode)), `got ${otpReq.status}`);
   if (otpReq.status !== 202) console.log(`info E03 response: ${JSON.stringify(J(otpReq)).slice(0, 120)}`);
+  const devCode = J(otpReq).dev_code as string | undefined;
   const otpWrong = await req('POST', '/auth/buyer/otp/verify', { email: buyerEmail, code: '000000' });
   check('E04 wrong code 400', otpWrong.status === 400);
   const otpVerifyWrong = await req('POST', '/auth/otp/verify', { email: buyerEmail, code: '000000' });
   check('A2 wrong code 400', otpVerifyWrong.status === 400, `got ${otpVerifyWrong.status}`);
-  await db.buyer.upsert({ where: { email: buyerEmail }, update: {}, create: { email: buyerEmail } });
-  const buyer = await db.buyer.findUniqueOrThrow({ where: { email: buyerEmail } });
-  const buyerToken = signAccessToken({ sub: buyer.id, role: 'buyer' });
+  let buyerToken: string;
+  if (devCode) {
+    const otpOk = await req('POST', '/auth/buyer/otp/verify', { email: buyerEmail, code: devCode });
+    check('E04 verify 200', otpOk.status === 200 && (J(otpOk).buyer as { email?: string })?.email === buyerEmail);
+    buyerToken = J(otpOk).token as string;
+  } else {
+    await db.buyer.upsert({ where: { email: buyerEmail }, update: {}, create: { email: buyerEmail } });
+    const buyer = await db.buyer.findUniqueOrThrow({ where: { email: buyerEmail } });
+    buyerToken = signAccessToken({ sub: buyer.id, role: 'buyer' });
+  }
   const crossTable = await req('POST', '/auth/seller/register', { name: 'Cross', email: buyerEmail, password: 'E2EPass123!' });
   check('uniqueness buyer-email seller register 409', crossTable.status === 409, `got ${crossTable.status}`);
   const patchBuyer = await req('PATCH', '/auth/me', { name: 'E2E Buyer Renamed', phone: '+2348012345678' }, buyerToken);
@@ -216,7 +235,11 @@ async function main() {
   const patchBuyerBiz = await req('PATCH', '/auth/me', { business_name: 'Nope Ltd' }, buyerToken);
   check('A8 buyer seller field 400', patchBuyerBiz.status === 400, `got ${patchBuyerBiz.status}`);
 
-  const oos = await req('POST', '/orders', { product_id: zeroId, delivery_address: '14 Allen Avenue, Ikeja, Lagos' }, buyerToken);
+  const oosProd = await req('POST', '/products', {
+    name: 'E2E OOS Fixture', priceKobo: 500000, stockQuantity: 0, description: 'Zero-stock fixture.',
+  }, sellerToken);
+  const oosProdId = ((J(oosProd) as { id?: string }).id ?? '');
+  const oos = await req('POST', '/orders', { product_id: oosProdId, delivery_address: '14 Allen Avenue, Ikeja, Lagos' }, buyerToken);
   check('E12 out-of-stock 409', oos.status === 409, `got ${oos.status}`);
 
   async function makeOrder() {
@@ -228,10 +251,14 @@ async function main() {
   }
   const o1 = await makeOrder();
   check('E12 create 201 + checkout', true);
+  const delUsed = await req('DELETE', `/products/${prodId}`, undefined, sellerToken);
+  check('DELETE with orders 409', delUsed.status === 409);
   const oList = await req('GET', '/orders', undefined, buyerToken);
   check('E13 buyer list', oList.status === 200 && Array.isArray(J(oList)));
+  check('R1 list buyer_email + payout + display', ((J(oList) as unknown as Array<Record<string, unknown>>)[0]?.buyer_email as string) === buyerEmail);
   const oDetail = await req('GET', `/orders/${o1.id}`, undefined, buyerToken);
   check('E14 pending shape', oDetail.status === 200 && J(oDetail).status === 'PendingPayment' && Array.isArray(J(oDetail).events));
+  check('R3 display_status on detail + events', (J(oDetail) as { display_status?: string }).display_status === 'Pending Payment');
   const oForeign = await req('GET', `/orders/${o1.id}`);
   check('E14 anon 401', oForeign.status === 401);
   const sellerCantOrder = await req('POST', '/orders', { product_id: prodId, delivery_address: '14 Allen Avenue, Ikeja, Lagos' }, sellerToken);
@@ -248,7 +275,7 @@ async function main() {
   const track = await req('PATCH', `/orders/${o1.id}/tracking`, { tracking_status: 'In Transit' }, sellerToken);
   check('E18 tracking forward 200', track.status === 200);
   const trackBack = await req('PATCH', `/orders/${o1.id}/tracking`, { tracking_status: 'Picked Up' }, sellerToken);
-  check('E18 tracking backward 400', trackBack.status === 400);
+  check('E18 tracking backward 409', trackBack.status === 409);
 
   const confirm = await req('POST', `/orders/${o1.id}/confirm-delivery`, undefined, buyerToken);
   const payoutFailed = confirm.status === 502;
@@ -268,6 +295,8 @@ async function main() {
   check('E20 dispute 200', dispute.status === 200 && J(dispute).status === 'Disputed');
   const frozenView = await req('GET', `/orders/${o2.id}/payout`, undefined, buyerToken);
   check('E21 disputed frozen', frozenView.status === 200 && J(frozenView).status === 'frozen');
+  const o2detail = await req('GET', `/orders/${o2.id}`, undefined, buyerToken);
+  check('R4 embedded payout frozen on Disputed', ((J(o2detail) as { payout?: { status?: string } }).payout?.status) === 'frozen');
   const confirmDisputed = await req('POST', `/orders/${o2.id}/confirm-delivery`, undefined, buyerToken);
   check('E19 on Disputed 409', confirmDisputed.status === 409, `got ${confirmDisputed.status}`);
 
