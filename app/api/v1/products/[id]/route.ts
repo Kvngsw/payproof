@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { authenticate, getRequestId } from '@/lib/auth';
+import { checkRateLimit } from '@/lib/rate-limit';
 import {
   ok,
   badRequest,
@@ -10,19 +11,45 @@ import {
   notFound,
   conflict,
   handleError,
+  tooManyRequestsResponse,
 } from '@/lib/api-response';
 
 export const dynamic = 'force-dynamic';
 
-const PatchSchema = z.object({
-  name: z.string().trim().min(2).optional(),
-  priceKobo: z.number().int().positive().optional(),
-  dispatchFeeKobo: z.number().int().nonnegative().optional(),
-  deliveryDays: z.number().int().min(1).optional(),
-  stockQuantity: z.number().int().nonnegative().optional(),
-  description: z.string().trim().min(10).optional(),
-  imageUrl: z.string().url().optional(),
-});
+const PatchSchema = z
+  .object({
+    name: z.string().trim().min(2).optional(),
+    priceKobo: z.number().int().positive().optional(),
+    price_kobo: z.number().int().positive().optional(),
+    dispatchFeeKobo: z.number().int().nonnegative().optional(),
+    dispatch_fee_kobo: z.number().int().nonnegative().optional(),
+    deliveryDays: z.number().int().min(1).optional(),
+    delivery_days: z.number().int().min(1).optional(),
+    stockQuantity: z.number().int().nonnegative().optional(),
+    stock_quantity: z.number().int().nonnegative().optional(),
+    description: z.string().trim().optional(),
+    imageUrl: z.string().trim().optional().transform((v) => (!v ? undefined : v)).pipe(z.string().url().optional()),
+    image_url: z.string().trim().optional().transform((v) => (!v ? undefined : v)).pipe(z.string().url().optional()),
+  })
+  .transform((v) => ({
+    ...(v.name !== undefined && { name: v.name }),
+    ...(v.priceKobo ?? v.price_kobo !== undefined
+      ? { priceKobo: (v.priceKobo ?? v.price_kobo) as number }
+      : {}),
+    ...(v.dispatchFeeKobo ?? v.dispatch_fee_kobo !== undefined
+      ? { dispatchFeeKobo: (v.dispatchFeeKobo ?? v.dispatch_fee_kobo) as number }
+      : {}),
+    ...(v.deliveryDays ?? v.delivery_days !== undefined
+      ? { deliveryDays: (v.deliveryDays ?? v.delivery_days) as number }
+      : {}),
+    ...(v.stockQuantity ?? v.stock_quantity !== undefined
+      ? { stockQuantity: (v.stockQuantity ?? v.stock_quantity) as number }
+      : {}),
+    ...(v.description !== undefined && { description: v.description }),
+    ...((v.imageUrl ?? v.image_url) !== undefined
+      ? { imageUrl: (v.imageUrl ?? v.image_url) as string }
+      : {}),
+  }));
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -55,10 +82,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const { id } = await params;
     const product = await db.product.findUnique({ where: { id } });
-    if (!product) return notFound('Product');
-
-    if (product.sellerId !== String(claims.sub)) {
-      return forbidden('You can only update your own products.');
+    if (!product || product.sellerId !== String(claims.sub)) {
+      return notFound('Product');
     }
 
     const raw = await request.json().catch(() => null);
@@ -82,6 +107,9 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     const claims = authenticate(request);
     if (!claims) return unauthorized();
     if (claims.role !== 'seller') return forbidden('Only sellers can delete products.');
+
+    const { allowed, retryAfterMs } = await checkRateLimit(`act:prod-delete:${claims.sub}`, 20, 60_000);
+    if (!allowed) return tooManyRequestsResponse(retryAfterMs);
 
     const { id } = await params;
     const product = await db.product.findUnique({ where: { id } });

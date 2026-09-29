@@ -22,14 +22,22 @@ const CreateSchema = z.object({
   dispatchFeeKobo: z.number().int().nonnegative('dispatchFeeKobo must be >= 0').optional(),
   deliveryDays: z.number().int().min(0, 'deliveryDays must be >= 0').optional(),
   stockQuantity: z.number().int().nonnegative().default(1),
-  description: z.string().trim().min(10, 'description must be at least 10 characters'),
-  imageUrl: z.string().url('imageUrl must be a valid URL').optional(),
+  description: z.string().trim().default(''),
+  imageUrl: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (!v ? undefined : v))
+    .pipe(z.string().url('imageUrl must be a valid URL').optional()),
 });
 
 export async function GET(request: NextRequest) {
   const requestId = getRequestId(request);
 
   try {
+    const claims = authenticate(request);
+    if (!claims) return unauthorized(); // inventory is tenant data: no anonymous listing
+
     const sellerId = request.nextUrl.searchParams.get('seller_id');
 
     const products = await db.product.findMany({

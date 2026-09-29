@@ -43,6 +43,12 @@ const schema = z.object({
     (v) => (v === '' ? undefined : v),
     z.string().min(1).optional(),
   ),
+  RESEND_API_KEY: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().min(1).optional(),
+  ),
+  OTP_FROM_EMAIL: z.string().email().default('noreply@payproof.ng'),
+  OTP_MODE: z.enum(['dev', 'live']).default('dev'),
 
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required'),
   GEMINI_MODEL: z.string().min(1).default('gemini-3.8-flash'), // config, not code: Google retires models without warning

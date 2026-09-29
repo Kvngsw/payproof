@@ -5,6 +5,7 @@ import db from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { checkRateLimit, clientIp } from '@/lib/rate-limit';
 import { authenticate, getRequestId } from '@/lib/auth';
+import { displayStatus } from '@/lib/order-view';
 import { initializeTransaction } from '@/lib/monnify';
 import {
   ok,
@@ -53,11 +54,29 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         updatedAt: true,
         product: { select: { id: true, name: true, imageUrl: true } },
+        buyer: { select: { email: true } },
+        payouts: { select: { status: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return ok(orders);
+    return ok(
+      orders.map((o) => ({
+        ...o,
+        display_status: displayStatus(o.status),
+        buyer_email: o.buyer?.email ?? null,
+        payout: {
+          status:
+            o.status === 'Disputed'
+              ? 'frozen'
+              : o.payouts.length === 0
+                ? 'none'
+                : o.payouts.every((p) => p.status === 'paid')
+                  ? 'paid'
+                  : 'pending',
+        },
+      })),
+    );
   } catch (err) {
     return handleError(err, 'GET /api/v1/orders', requestId);
   }

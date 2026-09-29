@@ -2,7 +2,7 @@ import db from './db';
 import { logger } from './logger';
 import { initiatePayout } from './monnify';
 import { splitPayout }   from './order-service';
-import { PayoutFrozenError } from './errors';
+import { PayoutFrozenError, NotFoundError, InvalidTransitionError, NoSettlementError } from './errors';
 
 export interface PayoutStatus {
   status:     'none' | 'pending' | 'paid' | 'partial' | 'frozen' | 'failed';
@@ -25,9 +25,9 @@ export async function releasePayout(orderId: string): Promise<PayoutStatus> {
       },
     });
 
-    if (!order) throw new Error(`Order ${orderId} not found`);
+    if (!order) throw new NotFoundError(`Order ${orderId}`);
     if (order.status !== 'Completed') {
-      throw new Error(`Order ${orderId} is not Completed (status: ${order.status})`);
+      throw new InvalidTransitionError(order.status, 'Completed');
     }
     if (order.orderEvents.length > 0) { // belt-and-braces: scan history even though status gates first
       throw new PayoutFrozenError(orderId);
@@ -51,7 +51,7 @@ export async function releasePayout(orderId: string): Promise<PayoutStatus> {
   const seller = order.seller;
   if (!seller?.settlementBank || !seller?.settlementNumber) {
     await db.order.update({ where: { id: orderId }, data: { payoutClaimedAt: null } });
-    throw new Error('Seller has no settlement account configured.');
+    throw new NoSettlementError(orderId);
   }
 
   const sourceAccount = process.env.MONNIFY_WALLET_ACCOUNT_NUMBER!;

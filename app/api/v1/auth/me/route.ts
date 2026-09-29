@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
           reservedAccountNumber: true,
           reservedBankName: true,
           reservedAccountName: true,
+          createdAt: true,
         },
       });
 
@@ -42,14 +43,25 @@ export async function GET(request: NextRequest) {
         return unauthorized('Session expired. Please log in again.');
       }
 
+      const reservedAccount = seller.reservedAccountNumber
+        ? {
+            account_number: seller.reservedAccountNumber,
+            bank_name: seller.reservedBankName,
+            account_name: seller.reservedAccountName,
+          }
+        : null;
+
       return ok({
         role: 'seller',
+        reserved_account: reservedAccount,
         profile: {
           id: seller.id,
           name: seller.name,
           businessName: seller.businessName,
+          business_name: seller.businessName,
           email: seller.email,
           phone: seller.phone,
+          created_at: seller.createdAt,
           settlement: seller.settlementNumber && seller.settlementBank
             ? { bankCode: seller.settlementBank, accountNumber: seller.settlementNumber }
             : null,
