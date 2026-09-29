@@ -235,6 +235,43 @@ async function main() {
   const patchBuyerBiz = await req('PATCH', '/auth/me', { business_name: 'Nope Ltd' }, buyerToken);
   check('A8 buyer seller field 400', patchBuyerBiz.status === 400, `got ${patchBuyerBiz.status}`);
 
+  const inv = await req('POST', '/invoices', {
+    items: [{ product_id: prodId, quantity: 1 }],
+    customer_name: 'E2E Buyer',
+    customer_contact: buyerEmail,
+    note: 'E2E invoice',
+  }, sellerToken);
+  check('INV create 201', inv.status === 201, `got ${inv.status}`);
+  const invId = (J(inv) as { id?: string }).id ?? '';
+  check('INV code shape + totals', /^INV-[0-9A-F]{6}$/.test(invId) && (J(inv) as { total_kobo?: number }).total_kobo === (J(inv) as { product_kobo?: number }).product_kobo! + (J(inv) as { dispatch_fee_kobo?: number }).dispatch_fee_kobo!);
+  const invGetS = await req('GET', `/invoices/${invId}`, undefined, sellerToken);
+  check('INV seller get 200', invGetS.status === 200 && (J(invGetS) as { status?: string }).status === 'pending');
+  const invGetB = await req('GET', `/invoices/${invId}`, undefined, buyerToken);
+  check('INV buyer get 200', invGetB.status === 200 && ((J(invGetB) as { seller?: { business_name?: string } }).seller?.business_name ?? '') !== '');
+  const invAnon = await req('GET', `/invoices/${invId}`);
+  check('INV anon 401', invAnon.status === 401);
+  const invMulti = await req('POST', '/invoices', {
+    items: [{ product_id: prodId, quantity: 1 }, { product_id: prodId, quantity: 1 }],
+    customer_name: 'X', customer_contact: buyerEmail,
+  }, sellerToken);
+  check('INV multi-item 400', invMulti.status === 400, `got ${invMulti.status}`);
+  const invQty = await req('POST', '/invoices', {
+    items: [{ product_id: prodId, quantity: 2 }],
+    customer_name: 'X', customer_contact: buyerEmail,
+  }, sellerToken);
+  check('INV qty-2 400', invQty.status === 400, `got ${invQty.status}`);
+  const invNoProd = await req('POST', '/invoices', {
+    items: [{ product_id: '00000000-0000-0000-0000-000000000000', quantity: 1 }],
+    customer_name: 'X', customer_contact: buyerEmail,
+  }, sellerToken);
+  check('INV unknown product 404', invNoProd.status === 404, `got ${invNoProd.status}`);
+  const invCancelBuyer = await req('POST', `/invoices/${invId}/cancel`, undefined, buyerToken);
+  check('INV cancel buyer 403', invCancelBuyer.status === 403, `got ${invCancelBuyer.status}`);
+  const invCancel = await req('POST', `/invoices/${invId}/cancel`, undefined, sellerToken);
+  check('INV cancel 200', invCancel.status === 200 && (J(invCancel) as { status?: string }).status === 'cancelled', `got ${invCancel.status}`);
+  const invCancelAgain = await req('POST', `/invoices/${invId}/cancel`, undefined, sellerToken);
+  check('INV cancel again 409', invCancelAgain.status === 409, `got ${invCancelAgain.status}`);
+
   const oosProd = await req('POST', '/products', {
     name: 'E2E OOS Fixture', priceKobo: 500000, stockQuantity: 0, description: 'Zero-stock fixture.',
   }, sellerToken);
