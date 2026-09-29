@@ -45,9 +45,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npx prisma generate
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+      - run: bunx prisma generate
       - run: npx tsc --noEmit
       - run: npx vitest run
       - run: npx prisma validate
