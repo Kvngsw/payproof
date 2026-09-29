@@ -528,9 +528,8 @@ export async function createProduct(payload: {
     priceKobo: payload.price_kobo,
     stockQuantity: payload.stock_quantity ?? 1,
     description: padDescription(payload.description),
-    // Platform calculates these for sellers (decision D7) — silent defaults (W4)
-    dispatchFeeKobo: 0,
-    deliveryDays: 1,
+    // dispatchFeeKobo/deliveryDays intentionally omitted — platform defaults
+    // apply server-side (D20 / api-contract E10: ₦2,500 dispatch, 3 days)
   };
   if (payload.image_url) body.imageUrl = payload.image_url;
   const row = await authFetch("/products", {

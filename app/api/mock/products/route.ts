@@ -95,7 +95,8 @@ export async function POST(request: Request) {
     seller_id: seller.id,
     name,
     price_kobo: Math.round(priceKobo),
-    dispatch_fee_kobo: Math.max(0, Math.round(Number(body.dispatch_fee_kobo) || 0)),
+    // Omitted or 0 → ₦2,500 platform default (D20 / api-contract E10)
+    dispatch_fee_kobo: Math.max(0, Math.round(Number(body.dispatch_fee_kobo) || 250000)),
     description: String(body.description ?? "").trim(),
     image_url: String(body.image_url ?? "").trim(),
     stock_quantity: Math.max(0, Math.round(Number(body.stock_quantity) || 0)),

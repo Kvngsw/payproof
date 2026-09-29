@@ -18,8 +18,9 @@ export const dynamic = 'force-dynamic';
 const CreateSchema = z.object({
   name: z.string().trim().min(2, 'name must be at least 2 characters'),
   priceKobo: z.number().int('priceKobo must be an integer (kobo, not naira)').positive('priceKobo must be positive'),
-  dispatchFeeKobo: z.number().int().nonnegative('dispatchFeeKobo must be >= 0'),
-  deliveryDays: z.number().int().min(1, 'deliveryDays must be at least 1'),
+  // Omitted or 0 → platform defaults below (D20 / api-contract E10).
+  dispatchFeeKobo: z.number().int().nonnegative('dispatchFeeKobo must be >= 0').optional(),
+  deliveryDays: z.number().int().min(0, 'deliveryDays must be >= 0').optional(),
   stockQuantity: z.number().int().nonnegative().default(1),
   description: z.string().trim().min(10, 'description must be at least 10 characters'),
   imageUrl: z.string().url('imageUrl must be a valid URL').optional(),
@@ -68,7 +69,12 @@ export async function POST(request: NextRequest) {
     }
 
     const product = await db.product.create({
-      data: { ...parsed.data, sellerId: String(claims.sub) },
+      data: {
+        ...parsed.data,
+        dispatchFeeKobo: parsed.data.dispatchFeeKobo || 250000,
+        deliveryDays: parsed.data.deliveryDays || 3,
+        sellerId: String(claims.sub),
+      },
     });
 
     logger.info('Product created', {
