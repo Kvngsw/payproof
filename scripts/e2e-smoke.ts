@@ -150,6 +150,20 @@ async function main() {
     deliveryDays: 1, stockQuantity: 0, description: 'Zero stock test product.',
   }, sellerToken);
   check('E10 zero-stock create 201', pZero.status === 201);
+  const pDefaults = await req('POST', '/products', {
+    name: 'E2E D20 Defaults', priceKobo: 750000, stockQuantity: 3,
+    description: 'Dispatch and delivery days omitted.',
+  }, sellerToken);
+  check('E10 omitted dispatch/delivery → D20 defaults', pDefaults.status === 201
+    && J(pDefaults).dispatchFeeKobo === 250000 && J(pDefaults).deliveryDays === 3,
+    `got ${pDefaults.status} ${JSON.stringify(J(pDefaults))}`);
+  const pZeroDays = await req('POST', '/products', {
+    name: 'E2E D20 Zero Days', priceKobo: 300000, dispatchFeeKobo: 150000,
+    deliveryDays: 0, stockQuantity: 1, description: 'Zero delivery days defaults.',
+  }, sellerToken);
+  check('E10 deliveryDays 0 → 3 (D20 zero-case)', pZeroDays.status === 201
+    && J(pZeroDays).deliveryDays === 3 && J(pZeroDays).dispatchFeeKobo === 150000,
+    `got ${pZeroDays.status} ${JSON.stringify(J(pZeroDays))}`);
   const prodId = J(p1).id;
   const zeroId = J(pZero).id;
 
