@@ -4,8 +4,9 @@ import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { authenticate, getRequestId } from '@/lib/auth';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { createReservedAccount, validateBankAccount } from '@/lib/monnify';
-import { ok, unauthorized, badRequest, handleError } from '@/lib/api-response';
+import { ok, unauthorized, badRequest, handleError, tooManyRequestsResponse } from '@/lib/api-response';
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -128,6 +129,9 @@ export async function PATCH(request: NextRequest) {
     if (!claims) {
       return unauthorized();
     }
+
+    const { allowed, retryAfterMs } = await checkRateLimit(`act:me:${claims.sub}`, 20, 60_000);
+    if (!allowed) return tooManyRequestsResponse(retryAfterMs);
 
     if (claims.role === 'buyer') {
       // A7 buyer branch: buyers may update name + phone only.
