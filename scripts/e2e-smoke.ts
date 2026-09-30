@@ -179,15 +179,18 @@ async function main() {
   check('E11 owner patch 200', patch.status === 200 && J(patch).priceKobo === 1200000);
 
   const all = await req('GET', '/products', undefined, sellerToken);
-  const foreign = (J(all) as unknown as Array<{ id: string; seller?: { id: string } }>).find(
-    (p) => p.seller?.id && p.seller.id !== sellerId,
-  );
-  if (foreign) {
-    const patchForeign = await req('PATCH', `/products/${foreign.id}`, { priceKobo: 1 }, sellerToken);
+  const allArr = J(all) as unknown as Array<{ id: string; seller?: { id: string } }>;
+  const scopedLeak = allArr.filter((p) => p.seller?.id && p.seller.id !== sellerId);
+  check('R7 unscoped authed list scoped to token seller', all.status === 200 && scopedLeak.length === 0, `got ${all.status} leak=${scopedLeak.length}`);
+  const foreignRow = await db.product.findFirst({ where: { sellerId: { not: sellerId } }, select: { id: true } });
+  if (foreignRow) {
+    const patchForeign = await req('PATCH', `/products/${foreignRow.id}`, { priceKobo: 1 }, sellerToken);
     check('E11 non-owner 404', patchForeign.status === 404, `got ${patchForeign.status}`);
   } else {
-    check('E11 non-owner 403', false, 'no foreign product found');
+    check('E11 non-owner 404', false, 'no foreign product found');
   }
+  const pubList = await req('GET', `/products?seller_id=${sellerId}`);
+  check('D23 public seller catalog 200', pubList.status === 200 && Array.isArray(J(pubList)), `got ${pubList.status}`);
   const anonCreate = await req('POST', '/products', { name: 'x' });
   check('E10 anon 401', anonCreate.status === 401);
   const anonList = await req('GET', '/products');

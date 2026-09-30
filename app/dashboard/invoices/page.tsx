@@ -116,9 +116,14 @@ export default function InvoicesPage() {
   }
 
   const loading = session.status === "loading" || (invoices === null && !failed);
+  // "Open" = anything not yet settled: pending or mid-payment (processing).
   const visible =
-    invoices?.filter((invoice) => view === "all" || invoice.status === "pending") ??
-    [];
+    invoices?.filter(
+      (invoice) =>
+        view === "all" ||
+        invoice.status === "pending" ||
+        invoice.status === "processing",
+    ) ?? [];
 
   return (
     <div className="space-y-6">

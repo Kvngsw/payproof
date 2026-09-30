@@ -1,27 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  cancelInvoice,
-  getInvoice,
-  invoiceLink,
-  type MockInvoice,
-} from "@/lib/api";
-import { useDashboardSession, useRequireSeller } from "@/components/dashboard/session-context";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { payInvoice, getInvoice, type MockInvoice } from "@/lib/api";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
-import { InvoiceBarcode } from "@/components/dashboard/invoice-barcode";
 import { InvoiceStatusChip } from "@/components/dashboard/invoice-status-chip";
 import { Amount } from "@/components/amount";
-import {
-  IconArrowLeft,
-  IconCopy,
-  IconCheck,
-  IconSend,
-} from "@tabler/icons-react";
+import { IconArrowLeft, IconCheck, IconAlertCircle, IconLoader2 } from "@tabler/icons-react";
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("en-NG", {
@@ -66,165 +57,206 @@ function Row({
   );
 }
 
-export default function InvoiceDetailPage() {
-  useRequireSeller();
-  const params = useParams<{ id: string }>();
-  const session = useDashboardSession();
+export default function InvoicePayPage() {
+  const params = useParams<{ invoiceId: string }>();
+  const router = useRouter();
+  const invoiceId = params.invoiceId;
+
   const [invoice, setInvoice] = useState<MockInvoice | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [formData, setFormData] = useState({ delivery_address: "", phone: "" });
+  const [errors, setErrors] = useState<{ delivery_address?: string; phone?: string }>({});
 
   useEffect(() => {
-    if (session.status !== "authed") return;
     let cancelled = false;
-    getInvoice(params.id)
+    getInvoice(invoiceId)
       .then((data) => {
-        if (!cancelled) setInvoice(data);
+        if (!cancelled) {
+          setInvoice(data);
+          setLoading(false);
+        }
       })
       .catch((err) => {
-        if (!cancelled)
-          setFailed(
-            err instanceof Error ? err.message : "Couldn't load this invoice.",
-          );
+        if (!cancelled) {
+          setFailed(err instanceof Error ? err.message : "Couldn't load this invoice.");
+          setLoading(false);
+        }
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [session.status, params.id]);
+    return () => { cancelled = true; };
+  }, [invoiceId]);
 
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(invoiceLink(params.id));
-      setCopied(true);
-      toast.success("Invoice link copied");
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Could not copy the link");
+  function validateForm() {
+    const newErrors: typeof errors = {};
+    if (!formData.delivery_address.trim() || formData.delivery_address.trim().length < 10) {
+      newErrors.delivery_address = "Delivery address must be at least 10 characters";
     }
+    if (!formData.phone.trim()) {
+      newErrors.phone = "Phone number is required";
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   }
 
-  async function handleCancel() {
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!validateForm()) return;
     if (!invoice) return;
+
     setBusy(true);
     try {
-      const updated = await cancelInvoice(invoice.id);
-      setInvoice(updated);
-      toast.success(`Invoice #${invoice.id} cancelled`);
+      const result = await payInvoice(invoiceId, {
+        delivery_address: formData.delivery_address.trim(),
+        phone: formData.phone.trim(),
+      });
+
+      toast.success("Payment initiated");
+
+      if (result.checkout_url) {
+        window.location.href = result.checkout_url;
+      } else if (result.order_id) {
+        router.push(`/dashboard/orders/${result.order_id}`);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
       setBusy(false);
     }
   }
 
-  const loading = session.status === "loading" || (invoice === null && !failed);
-
   if (loading) {
     return (
-      <div className="animate-pulse space-y-6" aria-hidden="true">
-        <div className="h-8 w-40 rounded-lg bg-muted" />
-        <div className="h-12 w-56 rounded-lg bg-muted" />
-        <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-          <div className="h-64 rounded-xl border border-border/60 bg-muted/40" />
-          <div className="h-64 rounded-xl border border-border/60 bg-muted/40" />
-        </div>
+      <div className="mx-auto max-w-2xl px-4 py-8 space-y-6" aria-hidden="true">
+        <div className="h-8 w-40 animate-pulse rounded-lg bg-muted" />
+        <div className="h-64 animate-pulse rounded-xl border border-border/60 bg-muted/40" />
       </div>
     );
   }
 
   if (failed || !invoice) {
     return (
-      <div className="rounded-xl border border-dashed border-border/60 p-10 text-center">
-        <h1 className="font-heading text-lg font-bold">Invoice not found</h1>
+      <div className="mx-auto max-w-2xl px-4 py-8 text-center">
+        <IconAlertCircle className="mx-auto size-12 text-muted-foreground" />
+        <h1 className="mt-4 font-heading text-xl font-bold">Invoice not found</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {failed ?? "It may have been cancelled, or the link is wrong."}
+          {failed ?? "This invoice may have been cancelled or the link is incorrect."}
         </p>
         <Link
-          href="/dashboard/invoices"
+          href="/"
           className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
         >
           <IconArrowLeft className="size-4" />
-          Back to invoices
+          Back to PayProof
         </Link>
       </div>
     );
   }
 
+  
+
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-2xl px-4 py-8 space-y-6">
       <Link
-        href="/dashboard/invoices"
+        href="/"
         className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         <IconArrowLeft className="size-4" />
-        Invoices
+        PayProof
       </Link>
 
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <header className="space-y-2">
         <h1 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl">
           <span className="font-mono">#{invoice.id}</span>
         </h1>
-        <InvoiceStatusChip status={invoice.status} />
-        <span className="text-sm text-muted-foreground">
-          Created {formatDateTime(invoice.created_at)}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <InvoiceStatusChip status={invoice.status} />
+          <span className="text-sm text-muted-foreground">
+            Created {formatDateTime(invoice.created_at)}
+          </span>
+        </div>
       </header>
 
       {invoice.status === "pending" && (
         <div className="rounded-2xl bg-secondary p-1">
           <section className="rounded-xl border border-border/60 bg-card p-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-medium">Share this link</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Your customer opens it, fills in delivery details, and sends
-                  payment. The invoice then becomes an order.
-                </p>
-              </div>
-              <Button onClick={copyLink}>
-                {copied ? (
-                  <IconCheck className="size-4" />
-                ) : (
-                  <IconCopy className="size-4" />
-                )}
-                Copy link
-              </Button>
-            </div>
-            <p className="mt-4 truncate rounded-lg border border-dashed border-border/60 bg-muted/40 px-3 py-2 font-mono text-xs text-muted-foreground">
-              {invoiceLink(invoice.id)}
+            <h2 className="font-heading text-lg font-bold">Complete your payment</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Fill in your delivery details to proceed to payment.
             </p>
-            <div className="mt-4 flex justify-end border-t border-dashed border-border/60 pt-4">
-              <Button
-                variant="outline"
-                onClick={handleCancel}
-                disabled={busy}
-              >
-                {busy ? "Cancelling..." : "Cancel invoice"}
+
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
+              <div className="space-y-1.5">
+                <Label htmlFor="delivery-address">Delivery address</Label>
+                <textarea
+                  id="delivery-address"
+                  rows={3}
+                  className={cn(
+                    "w-full rounded-3xl border border-transparent bg-input/50 px-3 py-2 text-base outline-none transition-[color,box-shadow,background-color] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm",
+                    errors.delivery_address && "border-destructive focus-visible:border-destructive"
+                  )}
+                  placeholder="14 Bode Thomas St, Surulere, Lagos"
+                  value={formData.delivery_address}
+                  onChange={(e) => setFormData({ ...formData, delivery_address: e.target.value })}
+                  required
+                  aria-invalid={errors.delivery_address ? "true" : "false"}
+                />
+                {errors.delivery_address && (
+                  <p className="text-sm text-destructive" role="alert">{errors.delivery_address}</p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="phone">Phone number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="08012345678"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  required
+                  aria-invalid={errors.phone ? "true" : "false"}
+                />
+                {errors.phone && (
+                  <p className="text-sm text-destructive" role="alert">{errors.phone}</p>
+                )}
+              </div>
+
+              <Button type="submit" className="w-full" disabled={busy} size="lg">
+                {busy ? (
+                  <>
+                    <IconLoader2 className="mr-2 size-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <IconCheck className="mr-2 size-4" />
+                    Pay <Amount value={invoice.total_kobo / 100} />
+                  </>
+                )}
               </Button>
-            </div>
+            </form>
           </section>
         </div>
       )}
 
       {invoice.status === "processing" && (
         <div className="flex items-center gap-2.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-sm">
-          <IconSend className="size-4 shrink-0 text-sky-600 dark:text-sky-400" />
+          <IconLoader2 className="size-4 shrink-0 text-sky-600 dark:text-sky-400 animate-spin" />
           <p>
-            The customer started checkout.
+            Payment in progress.
             {invoice.order_id ? (
               <>
                 {" "}
-                <Link
+                <a
                   href={`/dashboard/orders/${invoice.order_id}`}
                   className="font-medium text-primary hover:underline"
                 >
                   View the order
-                </Link>{" "}
+                </a>{" "}
                 to track payment confirmation.
               </>
             ) : (
-              " Payment confirmation is pending."
+              " Please wait for payment confirmation."
             )}
           </p>
         </div>
@@ -238,12 +270,12 @@ export default function InvoiceDetailPage() {
             {invoice.order_id ? (
               <>
                 {" "}
-                <Link
+                <a
                   href={`/dashboard/orders/${invoice.order_id}`}
                   className="font-medium text-primary hover:underline"
                 >
                   View the order
-                </Link>
+                </a>
               </>
             ) : (
               " The order is being prepared."
@@ -254,8 +286,7 @@ export default function InvoiceDetailPage() {
 
       {invoice.status === "cancelled" && (
         <div className="rounded-lg border border-border/60 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          This invoice was cancelled. Create a new one if the customer still
-          wants to pay.
+          This invoice was cancelled.
         </div>
       )}
 
@@ -274,17 +305,11 @@ export default function InvoiceDetailPage() {
                     name={item.name}
                     className="size-8 shrink-0 rounded-lg"
                   />
-                  <span className="truncate text-sm font-medium">
-                    {item.name}
-                  </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    × {item.quantity}
-                  </span>
+                  <span className="truncate text-sm font-medium">{item.name}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">× {item.quantity}</span>
                 </span>
                 <span className="shrink-0 text-sm font-medium tabular-nums">
-                  <Amount
-                    value={(item.quantity * item.unit_price_kobo) / 100}
-                  />
+                  <Amount value={(item.quantity * item.unit_price_kobo) / 100} />
                 </span>
               </li>
             ))}
@@ -304,18 +329,14 @@ export default function InvoiceDetailPage() {
             </Row>
             {invoice.note && (
               <Row label="Note">
-                <span className="max-w-64 whitespace-normal font-normal">
-                  {invoice.note}
-                </span>
+                <span className="max-w-64 whitespace-normal font-normal">{invoice.note}</span>
               </Row>
             )}
             <Row label="Status">
               <InvoiceStatusChip status={invoice.status} />
             </Row>
             <Row label="Created">
-              <span className="font-normal">
-                {formatDateTime(invoice.created_at)}
-              </span>
+              <span className="font-normal">{formatDateTime(invoice.created_at)}</span>
             </Row>
           </dl>
         </section>
@@ -346,9 +367,8 @@ export default function InvoiceDetailPage() {
               </span>
             </Row>
           </dl>
-          <InvoiceBarcode code={invoice.id} className="mt-4" />
           <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <IconSend className="size-3.5" />
+            <IconCheck className="size-3.5" />
             Amounts are locked in when the invoice is created.
           </p>
         </section>

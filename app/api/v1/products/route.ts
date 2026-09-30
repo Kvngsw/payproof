@@ -35,13 +35,25 @@ export async function GET(request: NextRequest) {
   const requestId = getRequestId(request);
 
   try {
-    const claims = authenticate(request);
-    if (!claims) return unauthorized(); // inventory is tenant data: no anonymous listing
-
     const sellerId = request.nextUrl.searchParams.get('seller_id');
 
+    if (sellerId) {
+      // D23: public storefront catalog (no auth required).
+      const products = await db.product.findMany({
+        where: { sellerId },
+        include: { seller: { select: { id: true, businessName: true } } },
+        orderBy: { createdAt: 'desc' },
+      });
+      return ok(products);
+    }
+
+    // R7: no anonymous unscoped listing; authed sellers see only their own inventory.
+    const claims = authenticate(request);
+    if (!claims) return unauthorized();
+    if (claims.role !== 'seller') return forbidden('Only sellers list inventory.');
+
     const products = await db.product.findMany({
-      where: sellerId ? { sellerId } : undefined,
+      where: { sellerId: String(claims.sub) },
       include: { seller: { select: { id: true, businessName: true } } },
       orderBy: { createdAt: 'desc' },
     });

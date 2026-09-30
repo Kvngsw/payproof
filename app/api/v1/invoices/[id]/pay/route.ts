@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { authenticate, getRequestId } from '@/lib/auth';
 import { initializeTransaction } from '@/lib/monnify';
-import { shapeInvoice } from '@/lib/invoices';
+import { shapeInvoice, buyerMatchesContact } from '@/lib/invoices';
 import {
   ok,
   badRequest,
@@ -60,6 +60,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     const buyerId = String(claims.sub);
     const buyer = await db.buyer.findUnique({ where: { id: buyerId } });
     if (!buyer) return unauthorized('Session expired. Please log in again.');
+    if (!buyerMatchesContact(buyer, invoice.customerContact)) {
+      return forbidden('This invoice does not belong to you.');
+    }
 
     const product = await db.product.findUnique({ where: { id: invoice.productId } });
     if (!product || product.stockQuantity < 1) {
@@ -129,7 +132,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         totalKobo: invoice.totalKobo,
         productName: invoice.productName,
         buyerEmail: buyer.email,
-        redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/orders/${order.id}/return`,
+        redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin}/dashboard/orders/${order.id}`,
       });
 
       await db.payment.update({

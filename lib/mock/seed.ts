@@ -429,8 +429,8 @@ const SEED_INVOICES: SeedInvoice[] = [
   },
   {
     id: "INV-C5B0E1",
-    product_kobo: 280000,
-    total_kobo: 280000,
+    product_kobo: 2800000,
+    total_kobo: 2800000,
     customer: { name: "Raheem Orekoya", contact: "" },
     note: "",
     status: "pending",
@@ -439,8 +439,8 @@ const SEED_INVOICES: SeedInvoice[] = [
       {
         product_name: "Canvas Slip-Ons",
         image_url: "",
-        quantity: 2,
-        unit_price_kobo: 140000,
+        quantity: 1,
+        unit_price_kobo: 2800000,
       },
     ],
   },

@@ -794,8 +794,8 @@
     },
     {
       "id": "INV-C5B0E1",
-      "product_kobo": 280000,
-      "total_kobo": 530000,
+      "product_kobo": 2800000,
+      "total_kobo": 3050000,
       "customer": {
         "name": "Raheem Orekoya",
         "contact": ""
@@ -808,8 +808,8 @@
           "product_id": "8fdb4bc1-e15a-4c2f-a703-a69cb0a57f9d",
           "name": "Canvas Slip-Ons",
           "image_url": "",
-          "quantity": 2,
-          "unit_price_kobo": 140000
+          "quantity": 1,
+          "unit_price_kobo": 2800000
         }
       ],
       "seller_id": "753dd83c-667e-4bc9-8201-04c0ffe3d8fc",

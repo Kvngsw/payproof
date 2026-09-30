@@ -14,12 +14,10 @@ import {
   getInvoice,
   listOrders,
   payInvoice,
-  useDataSource,
   type MockInvoice,
   type MockOrder,
 } from "@/lib/api";
 import { useDashboardSession } from "@/components/dashboard/session-context";
-import { DemoDataNotice } from "@/components/dashboard/demo-data-notice";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
 import { InvoiceStatusChip } from "@/components/dashboard/invoice-status-chip";
 import {
@@ -109,12 +107,10 @@ function CodeEntryCard({
   value,
   onChange,
   onSubmit,
-  source,
 }: {
   value: string;
   onChange: (next: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  source: "mock" | "live";
 }) {
   return (
     <section className="rounded-xl border border-dashed border-border/60 bg-card p-6">
@@ -127,28 +123,22 @@ function CodeEntryCard({
             Enter the code your seller shared to pay and track it as an order.
           </p>
         </div>
-        {source === "live" ? (
-          <div className="w-full max-w-sm">
-            <DemoDataNotice compact />
-          </div>
-        ) : (
-          <form className="flex items-center gap-2" onSubmit={onSubmit}>
-            <Label htmlFor="invoice-code" className="sr-only">
-              Invoice code
-            </Label>
-            <Input
-              id="invoice-code"
-              value={value}
-              onChange={(event) => onChange(event.target.value)}
-              placeholder="INV-XXXXXX"
-              autoCapitalize="characters"
-              autoComplete="off"
-              spellCheck={false}
-              className="w-44 text-center font-mono uppercase tracking-widest"
-            />
-            <Button type="submit">Pay invoice</Button>
-          </form>
-        )}
+        <form className="flex items-center gap-2" onSubmit={onSubmit}>
+          <Label htmlFor="invoice-code" className="sr-only">
+            Invoice code
+          </Label>
+          <Input
+            id="invoice-code"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="INV-XXXXXX"
+            autoCapitalize="characters"
+            autoComplete="off"
+            spellCheck={false}
+            className="w-44 text-center font-mono uppercase tracking-widest"
+          />
+          <Button type="submit">Pay invoice</Button>
+        </form>
       </div>
     </section>
   );
@@ -177,7 +167,6 @@ function InvoiceMessageCard({
 export function BuyerHome() {
   const router = useRouter();
   const session = useDashboardSession();
-  const source = useDataSource();
   const [orders, setOrders] = useState<MockOrder[] | null>(null);
 
   const [codeDraft, setCodeDraft] = useState("");
@@ -219,7 +208,7 @@ export function BuyerHome() {
   }, []);
 
   useEffect(() => {
-    if (!invoiceCode || source === "live") return;
+    if (!invoiceCode) return;
     let cancelled = false;
     // Deferred so state isn't reset synchronously inside the effect.
     queueMicrotask(() => {
@@ -237,7 +226,7 @@ export function BuyerHome() {
     return () => {
       cancelled = true;
     };
-  }, [invoiceCode, source]);
+  }, [invoiceCode]);
 
   if (session.status !== "authed") return null;
 
@@ -293,10 +282,15 @@ export function BuyerHome() {
 
     setBusy(true);
     try {
-      const { order_id } = await payInvoice(invoice.id, {
+      const { order_id, checkout_url } = await payInvoice(invoice.id, {
         delivery_address: trimmedAddress,
         phone: phone.trim(),
       });
+      if (checkout_url) {
+        // Live: real Monnify checkout — hand off, order stays PendingPayment.
+        window.location.assign(checkout_url);
+        return;
+      }
       toast.success("Payment confirmed — your order is on its way");
       router.push(`/dashboard/orders/${order_id}`);
     } catch (err) {
@@ -326,22 +320,6 @@ export function BuyerHome() {
       </Button>
     </header>
   );
-
-  if (invoiceCode && source === "live") {
-    return (
-      <div className="space-y-8">
-        {header}
-        <section className="rounded-xl border border-dashed border-border/60 bg-card p-6">
-          <h2 className="text-sm font-medium text-muted-foreground">
-            Pay an invoice
-          </h2>
-          <div className="pt-4">
-            <DemoDataNotice compact />
-          </div>
-        </section>
-      </div>
-    );
-  }
 
   if (invoiceCode) {
     let body: ReactNode;
@@ -380,6 +358,30 @@ export function BuyerHome() {
           <Button variant="outline" className="mt-4" onClick={clearInvoice}>
             Enter a different code
           </Button>
+        </InvoiceMessageCard>
+      );
+    } else if (invoice.status === "processing") {
+      body = (
+        <InvoiceMessageCard tone="success">
+          <h2 className="font-heading text-lg font-bold">
+            Payment started for <span className="font-mono">#{invoice.id}</span>
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Complete checkout to confirm your order. You can track it below.
+          </p>
+          {invoice.order_id && (
+            <Link
+              href={`/dashboard/orders/${invoice.order_id}`}
+              className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
+            >
+              View the order
+            </Link>
+          )}
+          <div className="mt-4">
+            <Button variant="outline" size="sm" onClick={clearInvoice}>
+              Enter a different code
+            </Button>
+          </div>
         </InvoiceMessageCard>
       );
     } else if (invoice.status === "paid") {
@@ -552,7 +554,7 @@ export function BuyerHome() {
                   {busy ? "Confirming payment..." : "Pay & create order"}
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">
-                  Demo mode — no real money moves.
+                  Sandbox payment — no real money moves.
                 </p>
               </form>
             </section>
@@ -629,7 +631,6 @@ export function BuyerHome() {
           event.preventDefault();
           openCode(codeDraft);
         }}
-        source={source}
       />
     </div>
   );

@@ -70,8 +70,21 @@ const schema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url().default('http://localhost:3000'),
 });
 
+const schemaWithRefinement = schema.refine(
+  (data) => {
+    if (data.NODE_ENV === 'production' && data.OTP_MODE !== 'live') {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: 'OTP_MODE must be "live" in production',
+    path: ['OTP_MODE'],
+  }
+);
+
 function parseEnv() {
-  const result = schema.safeParse(process.env);
+  const result = schemaWithRefinement.safeParse(process.env);
 
   if (!result.success) {
     const lines = result.error.issues.map(

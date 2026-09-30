@@ -570,10 +570,10 @@ export async function deleteProduct(id: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Invoices (docs/api-requests.md §1.1). Wired to the contract; until the BE
-// ships the routes, handleResponse turns the HTML 404 into the friendly
-// "isn't available on the Live API yet" message. FE ruling: live invoices are
-// single-item, quantity fixed at 1 (enforced by the form + below).
+// Invoices (docs/api-requests.md §1.1). Live routes require auth (E2E:
+// "INV anon 401"), so the share-link viewer must send the buyer's token.
+// FE ruling: live invoices are single-item, quantity fixed at 1 (enforced by
+// the form + below).
 // ---------------------------------------------------------------------------
 
 type RawInvoice = {
@@ -651,9 +651,9 @@ export async function createInvoice(payload: {
 }
 
 export async function getInvoice(id: string): Promise<MockInvoice> {
-  // Public route — buyers open the share link without a token (§1.1).
-  const res = await fetch(`${API}/invoices/${encodeURIComponent(id)}`);
-  return normalizeInvoice(await handleResponse(res));
+  // Authenticated: BE requires a token (seller-owner or the invoiced buyer).
+  const data = await authFetch(`/invoices/${encodeURIComponent(id)}`);
+  return normalizeInvoice(data);
 }
 
 export async function cancelInvoice(id: string): Promise<MockInvoice> {
@@ -663,12 +663,20 @@ export async function cancelInvoice(id: string): Promise<MockInvoice> {
   return normalizeInvoice(data);
 }
 
-// Pay stays stubbed until §6 settles the invoice payment rail.
-const INVOICES_LIVE_HINT =
-  "Invoices run on demo data for now — switch the data source to Demo data.";
-
-export async function payInvoice(): Promise<{ order_id: string }> {
-  throw new Error(INVOICES_LIVE_HINT);
+export async function payInvoice(
+  id: string,
+  payload: { delivery_address: string; phone: string },
+): Promise<{ order_id: string; checkout_url?: string }> {
+  // Live pay creates the order + Monnify session and returns a checkout URL
+  // the buyer must be redirected to; mock returns order_id only (instant).
+  const data = await authFetch(`/invoices/${encodeURIComponent(id)}/pay`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return {
+    order_id: data.order?.id ?? data.order_id,
+    checkout_url: data.payment?.checkout_url ?? data.checkout_url,
+  };
 }
 
 // ---------------------------------------------------------------------------

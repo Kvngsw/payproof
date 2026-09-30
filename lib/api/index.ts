@@ -188,7 +188,7 @@ export function payInvoice(
   id: string,
   payload: { delivery_address: string; phone: string },
 ) {
-  return isLive() ? live.payInvoice() : mock.payInvoice(id, payload);
+  return isLive() ? live.payInvoice(id, payload) : mock.payInvoice(id, payload);
 }
 
 export function invoiceLink(id: string) {

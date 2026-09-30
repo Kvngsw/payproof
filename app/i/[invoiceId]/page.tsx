@@ -1,27 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import {
-  cancelInvoice,
-  getInvoice,
-  invoiceLink,
-  type MockInvoice,
-} from "@/lib/api";
-import { useDashboardSession, useRequireSeller } from "@/components/dashboard/session-context";
+import Link from "next/link";
+import { getInvoice, type MockInvoice } from "@/lib/api";
 import { ProductThumb } from "@/components/dashboard/product-thumb";
-import { InvoiceBarcode } from "@/components/dashboard/invoice-barcode";
 import { InvoiceStatusChip } from "@/components/dashboard/invoice-status-chip";
 import { Amount } from "@/components/amount";
-import {
-  IconArrowLeft,
-  IconCopy,
-  IconCheck,
-  IconSend,
-} from "@tabler/icons-react";
+import { IconArrowLeft, IconExternalLink } from "@tabler/icons-react";
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString("en-NG", {
@@ -66,106 +52,76 @@ function Row({
   );
 }
 
-export default function InvoiceDetailPage() {
-  useRequireSeller();
-  const params = useParams<{ id: string }>();
-  const session = useDashboardSession();
+export default function PublicInvoicePage() {
+  const params = useParams<{ invoiceId: string }>();
+  const invoiceId = params.invoiceId;
+
   const [invoice, setInvoice] = useState<MockInvoice | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (session.status !== "authed") return;
     let cancelled = false;
-    getInvoice(params.id)
+    getInvoice(invoiceId)
       .then((data) => {
-        if (!cancelled) setInvoice(data);
+        if (!cancelled) {
+          setInvoice(data);
+          setLoading(false);
+        }
       })
       .catch((err) => {
-        if (!cancelled)
-          setFailed(
-            err instanceof Error ? err.message : "Couldn't load this invoice.",
-          );
+        if (!cancelled) {
+          setFailed(err instanceof Error ? err.message : "Couldn't load this invoice.");
+          setLoading(false);
+        }
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [session.status, params.id]);
-
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(invoiceLink(params.id));
-      setCopied(true);
-      toast.success("Invoice link copied");
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Could not copy the link");
-    }
-  }
-
-  async function handleCancel() {
-    if (!invoice) return;
-    setBusy(true);
-    try {
-      const updated = await cancelInvoice(invoice.id);
-      setInvoice(updated);
-      toast.success(`Invoice #${invoice.id} cancelled`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const loading = session.status === "loading" || (invoice === null && !failed);
+    return () => { cancelled = true; };
+  }, [invoiceId]);
 
   if (loading) {
     return (
-      <div className="animate-pulse space-y-6" aria-hidden="true">
-        <div className="h-8 w-40 rounded-lg bg-muted" />
-        <div className="h-12 w-56 rounded-lg bg-muted" />
-        <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-          <div className="h-64 rounded-xl border border-border/60 bg-muted/40" />
-          <div className="h-64 rounded-xl border border-border/60 bg-muted/40" />
-        </div>
+      <div className="mx-auto max-w-2xl px-4 py-8 space-y-6" aria-hidden="true">
+        <div className="h-8 w-40 animate-pulse rounded-lg bg-muted" />
+        <div className="h-64 animate-pulse rounded-xl border border-border/60 bg-muted/40" />
       </div>
     );
   }
 
   if (failed || !invoice) {
     return (
-      <div className="rounded-xl border border-dashed border-border/60 p-10 text-center">
-        <h1 className="font-heading text-lg font-bold">Invoice not found</h1>
+      <div className="mx-auto max-w-2xl px-4 py-8 text-center">
+        <h1 className="font-heading text-xl font-bold">Invoice not found</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {failed ?? "It may have been cancelled, or the link is wrong."}
+          {failed ?? "This invoice may have been cancelled or the link is incorrect."}
         </p>
         <Link
-          href="/dashboard/invoices"
+          href="/"
           className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
         >
           <IconArrowLeft className="size-4" />
-          Back to invoices
+          Back to PayProof
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-2xl px-4 py-8 space-y-6">
       <Link
-        href="/dashboard/invoices"
+        href="/"
         className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
         <IconArrowLeft className="size-4" />
-        Invoices
+        PayProof
       </Link>
 
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <h1 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl">
-          <span className="font-mono">#{invoice.id}</span>
-        </h1>
-        <InvoiceStatusChip status={invoice.status} />
+      <header className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="font-heading text-2xl font-extrabold tracking-tight sm:text-3xl">
+            <span className="font-mono">#{invoice.id}</span>
+          </h1>
+          <InvoiceStatusChip status={invoice.status} />
+        </div>
         <span className="text-sm text-muted-foreground">
           Created {formatDateTime(invoice.created_at)}
         </span>
@@ -173,69 +129,35 @@ export default function InvoiceDetailPage() {
 
       {invoice.status === "pending" && (
         <div className="rounded-2xl bg-secondary p-1">
-          <section className="rounded-xl border border-border/60 bg-card p-6">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-medium">Share this link</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Your customer opens it, fills in delivery details, and sends
-                  payment. The invoice then becomes an order.
-                </p>
-              </div>
-              <Button onClick={copyLink}>
-                {copied ? (
-                  <IconCheck className="size-4" />
-                ) : (
-                  <IconCopy className="size-4" />
-                )}
-                Copy link
-              </Button>
-            </div>
-            <p className="mt-4 truncate rounded-lg border border-dashed border-border/60 bg-muted/40 px-3 py-2 font-mono text-xs text-muted-foreground">
-              {invoiceLink(invoice.id)}
+          <div className="rounded-xl border border-border/60 bg-card p-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              This invoice is awaiting payment from <strong>{invoice.customer.name}</strong>.
             </p>
-            <div className="mt-4 flex justify-end border-t border-dashed border-border/60 pt-4">
-              <Button
-                variant="outline"
-                onClick={handleCancel}
-                disabled={busy}
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                href={`/pay/${invoice.id}`}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 text-base font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
               >
-                {busy ? "Cancelling..." : "Cancel invoice"}
-              </Button>
+                Pay Now
+                <IconExternalLink className="size-4" />
+              </Link>
+              <Link
+                href={`/pay/${invoice.id}`}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-border/60 bg-background px-6 py-3 text-base font-medium hover:bg-muted transition-colors"
+              >
+                View Details
+              </Link>
             </div>
-          </section>
+          </div>
         </div>
       )}
 
       {invoice.status === "processing" && (
         <div className="flex items-center gap-2.5 rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-sm">
-          <IconSend className="size-4 shrink-0 text-sky-600 dark:text-sky-400" />
+          <span className="size-4 shrink-0" />
           <p>
-            The customer started checkout.
-            {invoice.order_id ? (
-              <>
-                {" "}
-                <Link
-                  href={`/dashboard/orders/${invoice.order_id}`}
-                  className="font-medium text-primary hover:underline"
-                >
-                  View the order
-                </Link>{" "}
-                to track payment confirmation.
-              </>
-            ) : (
-              " Payment confirmation is pending."
-            )}
-          </p>
-        </div>
-      )}
-
-      {invoice.status === "paid" && (
-        <div className="flex items-center gap-2.5 rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-sm">
-          <IconCheck className="size-4 shrink-0 text-primary" />
-          <p>
-            Paid {invoice.paid_at ? formatDateTime(invoice.paid_at) : ""}.
-            {invoice.order_id ? (
+            Payment in progress. Order confirmation is pending.
+            {invoice.order_id && (
               <>
                 {" "}
                 <Link
@@ -245,8 +167,26 @@ export default function InvoiceDetailPage() {
                   View the order
                 </Link>
               </>
-            ) : (
-              " The order is being prepared."
+            )}
+          </p>
+        </div>
+      )}
+
+      {invoice.status === "paid" && (
+        <div className="flex items-center gap-2.5 rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-sm">
+          <span className="size-4 shrink-0 text-primary">✓</span>
+          <p>
+            Paid {invoice.paid_at ? formatDateTime(invoice.paid_at) : ""}.
+            {invoice.order_id && (
+              <>
+                {" "}
+                <Link
+                  href={`/dashboard/orders/${invoice.order_id}`}
+                  className="font-medium text-primary hover:underline"
+                >
+                  View the order
+                </Link>
+              </>
             )}
           </p>
         </div>
@@ -254,8 +194,7 @@ export default function InvoiceDetailPage() {
 
       {invoice.status === "cancelled" && (
         <div className="rounded-lg border border-border/60 bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-          This invoice was cancelled. Create a new one if the customer still
-          wants to pay.
+          This invoice was cancelled.
         </div>
       )}
 
@@ -274,17 +213,11 @@ export default function InvoiceDetailPage() {
                     name={item.name}
                     className="size-8 shrink-0 rounded-lg"
                   />
-                  <span className="truncate text-sm font-medium">
-                    {item.name}
-                  </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    × {item.quantity}
-                  </span>
+                  <span className="truncate text-sm font-medium">{item.name}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">× {item.quantity}</span>
                 </span>
                 <span className="shrink-0 text-sm font-medium tabular-nums">
-                  <Amount
-                    value={(item.quantity * item.unit_price_kobo) / 100}
-                  />
+                  <Amount value={(item.quantity * item.unit_price_kobo) / 100} />
                 </span>
               </li>
             ))}
@@ -304,18 +237,14 @@ export default function InvoiceDetailPage() {
             </Row>
             {invoice.note && (
               <Row label="Note">
-                <span className="max-w-64 whitespace-normal font-normal">
-                  {invoice.note}
-                </span>
+                <span className="max-w-64 whitespace-normal font-normal">{invoice.note}</span>
               </Row>
             )}
             <Row label="Status">
               <InvoiceStatusChip status={invoice.status} />
             </Row>
             <Row label="Created">
-              <span className="font-normal">
-                {formatDateTime(invoice.created_at)}
-              </span>
+              <span className="font-normal">{formatDateTime(invoice.created_at)}</span>
             </Row>
           </dl>
         </section>
@@ -346,12 +275,16 @@ export default function InvoiceDetailPage() {
               </span>
             </Row>
           </dl>
-          <InvoiceBarcode code={invoice.id} className="mt-4" />
           <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <IconSend className="size-3.5" />
+            <IconExternalLink className="size-3.5" />
             Amounts are locked in when the invoice is created.
           </p>
         </section>
+      </div>
+
+      <div className="mt-6 rounded-lg border border-dashed border-border/60 p-4 text-center text-sm text-muted-foreground">
+        <p>This is a secure payment link from PayProof.</p>
+        <p className="mt-1">Share this link with your customer to collect payment.</p>
       </div>
     </div>
   );
