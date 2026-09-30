@@ -207,8 +207,16 @@ async function handleNotification(paymentRef: string, transactionRef: string, re
 
         await decrementStock(order.productId, tx);
 
-        await transition(order.id, 'Paid', 'system', `Monnify ref ${transactionRef}`, tx);
-        await transition(order.id, 'AwaitingShipment', 'system', undefined, tx);
+      await transition(order.id, 'Paid', 'system', `Monnify ref ${transactionRef}`, tx);
+      await transition(order.id, 'AwaitingShipment', 'system', undefined, tx);
+
+      const paymentRow = await tx.payment.findFirst({ where: { reference: paymentRef } });
+      if (paymentRow?.invoiceId) {
+        await tx.invoice.update({
+          where: { id: paymentRow.invoiceId },
+          data: { status: 'paid', paidAt: new Date() },
+        });
+      }
 
         const fraud = await runFraudCheck(order.sellerId, order.totalKobo);
         await tx.order.update({
