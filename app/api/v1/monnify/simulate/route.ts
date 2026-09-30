@@ -59,6 +59,15 @@ export async function POST(request: NextRequest) {
       await decrementStock(order.productId, tx);
       await transition(order.id, 'Paid', 'system', 'SIMULATED payment (sandbox)', tx);
       await transition(order.id, 'AwaitingShipment', 'system', undefined, tx);
+      const simPayment = await tx.payment.findFirst({
+        where: { reference: parsed.data.payment_reference },
+      });
+      if (simPayment?.invoiceId) {
+        await tx.invoice.update({
+          where: { id: simPayment.invoiceId },
+          data: { status: 'paid', paidAt: new Date() },
+        });
+      }
       const fraud = await runFraudCheck(order.sellerId, order.totalKobo);
       await tx.order.update({
         where: { id: order.id },

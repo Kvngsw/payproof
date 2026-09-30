@@ -226,6 +226,7 @@ model Invoice {
 model Payment {
   id               String    @id @default(uuid())
   orderId          String    @unique
+  invoiceId        String?   // set when born from POST /invoices/:id/pay; webhook flips that invoice paid
   provider         String    @default("monnify")
   reference        String    @unique   // OUR ref (webhook lookup key, E12/E15)
   providerRef      String?             // Monnify's transactionReference (verify calls)

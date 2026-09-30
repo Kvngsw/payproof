@@ -272,6 +272,28 @@ async function main() {
   const invCancelAgain = await req('POST', `/invoices/${invId}/cancel`, undefined, sellerToken);
   check('INV cancel again 409', invCancelAgain.status === 409, `got ${invCancelAgain.status}`);
 
+  const invPay = await req('POST', '/invoices', {
+    items: [{ product_id: prodId, quantity: 1 }],
+    customer_name: 'E2E Buyer',
+    customer_contact: buyerEmail,
+  }, sellerToken);
+  const payInvId = ((J(invPay) as { id?: string }).id ?? '');
+  const payBadAddr = await req('POST', `/invoices/${payInvId}/pay`, { delivery_address: 'short', phone: '+2348077777777' }, buyerToken);
+  check('INV pay bad address 400', payBadAddr.status === 400, `got ${payBadAddr.status}`);
+  const payAnon = await req('POST', `/invoices/${payInvId}/pay`, { delivery_address: '14 Allen Avenue, Ikeja, Lagos', phone: '+2348077777777' });
+  check('INV pay anon 401', payAnon.status === 401, `got ${payAnon.status}`);
+  const paySeller = await req('POST', `/invoices/${payInvId}/pay`, { delivery_address: '14 Allen Avenue, Ikeja, Lagos', phone: '+2348077777777' }, sellerToken);
+  check('INV pay seller 403', paySeller.status === 403, `got ${paySeller.status}`);
+  const payOk = await req('POST', `/invoices/${payInvId}/pay`, { delivery_address: '14 Allen Avenue, Ikeja, Lagos', phone: '+2348077777777' }, buyerToken);
+  check('INV pay 201 processing', payOk.status === 201 && (J(payOk).invoice as { status?: string })?.status === 'processing' && typeof (J(payOk).payment as { checkout_url?: string })?.checkout_url === 'string', `got ${payOk.status}`);
+  const payRef = ((J(payOk).payment as { reference?: string }) || {}).reference ?? '';
+  const payAgain = await req('POST', `/invoices/${payInvId}/pay`, { delivery_address: '14 Allen Avenue, Ikeja, Lagos', phone: '+2348077777777' }, buyerToken);
+  check('INV repay 409', payAgain.status === 409, `got ${payAgain.status}`);
+  const simInv = await req('POST', '/monnify/simulate', { payment_reference: payRef });
+  check('INV simulate order paid', simInv.status === 200, `got ${simInv.status}`);
+  const invPaid = await req('GET', `/invoices/${payInvId}`, undefined, buyerToken);
+  check('INV status paid + order linked', (J(invPaid) as { status?: string }).status === 'paid' && ((J(invPaid) as { order_id?: string }).order_id ?? '') !== '');
+
   const oosProd = await req('POST', '/products', {
     name: 'E2E OOS Fixture', priceKobo: 500000, stockQuantity: 0, description: 'Zero-stock fixture.',
   }, sellerToken);
