@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { clearToken, useDataSource } from "@/lib/api";
+import { clearToken } from "@/lib/api";
 import { buttonVariants } from "@/components/ui/button";
 import { IconMenu2, IconX, IconLogout2 } from "@tabler/icons-react";
 import { useDashboardSession } from "./session-context";
@@ -37,14 +37,11 @@ function initialsOf(name?: string, fallback?: string) {
 export function DashboardNavbar() {
   const router = useRouter();
   const session = useDashboardSession();
-  const source = useDataSource();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const role =
     session.status === "authed" ? session.data.role : ("seller" as const);
-  const navItems = NAV_ITEMS[role].filter(
-    (item) => source !== "live" || item.href !== "/dashboard/invoices",
-  );
+  const navItems = NAV_ITEMS[role];
 
   const profile = session.status === "authed" ? session.data.profile : null;
   const displayName =

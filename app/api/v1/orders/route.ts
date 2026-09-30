@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
         totalKobo,
         productName: product.name,
         buyerEmail: buyer.email,
-        redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}/orders/${order.id}/return`,
+        redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin}/dashboard/orders/${order.id}`,
       });
 
       await db.payment.update({

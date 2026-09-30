@@ -45,6 +45,7 @@ async function main() {
     await db.payout.deleteMany({ where: { order: { sellerId: { in: oldIds } } } });
     await db.payment.deleteMany({ where: { order: { sellerId: { in: oldIds } } } });
     await db.order.deleteMany({ where: { sellerId: { in: oldIds } } });
+    await db.invoice.deleteMany({ where: { sellerId: { in: oldIds } } });
     await db.product.deleteMany({ where: { sellerId: { in: oldIds } } });
     await db.seller.deleteMany({ where: { id: { in: oldIds } } });
   }

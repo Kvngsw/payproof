@@ -1,4 +1,4 @@
-# API requests & parity notes — Frontend → Backend
+﻿# API requests & parity notes — Frontend → Backend
 
 > From the frontend team. Everything here is actionable: each item says what exists today,
 > what we need, and what the frontend does **in the meantime** so nothing is blocked.
@@ -13,9 +13,9 @@ Base URL: `https://payproof-seven.vercel.app/api/v1` · errors already compatibl
 
 | Pri | Ask | Detail | Until it lands |
 |---|---|---|---|
-| **P1** | Invoices endpoints | §1.1 — list/create/public-get/cancel + pay→order flow, Prisma models included | ✅ FE shipped this batch: live gates removed, create form constrained to **1 item × qty 1** (PM ruling), client wired to §1.1 — until the routes exist every call degrades to the friendly *"isn't available on the Live API yet"* message; pay stays stubbed pending §6 |
+| **P1** | Invoices endpoints | §1.1 — list/create/public-get/cancel + pay→order flow, Prisma models included | ✅ FE shipped this batch: live gates removed, create form constrained to **1 item × qty 1** (PM ruling), client wired to §1.1 -- routes now live (list/create/authenticated-get/cancel + pay-to-order); the fallback only triggers on genuine 404s |
 | **P1.5** | Auth v2 (password login + OTP for both roles) | §1.4 — breaking seller-register response, `Buyer.passwordHash`/`name` migration | ✅ shipped: FE + mock + v1 (A1–A7, V5) — live OTP needs `SMTP_*` on Vercel; A5 migration applied to local + prod |
-| **P2** | Response shapes | §2 — R1, R3, R5, R6 (high), R2, R4 (medium), **R7 is a security fix** (products list is public & unscoped today) | FE normalizes every response client-side (§4 W1–W3) — works, but adapters stay until you fix the shapes |
+| **P2** | Response shapes | §2 — R1, R3, R5, R6 (high), R2, R4 (medium), **R7 fixed 2026-09-30** (public only with `seller_id`; unscoped authed scoped to token seller) | FE normalizes every response client-side (§4 W1–W3) — works, but adapters stay until you fix the shapes |
 | **P3** | Validation relaxations | §3 — V1–V4, V6 | FE pads/sends silent defaults (§4 W4) — harmless but fragile |
 | ⚠️ | Decisions | §6 — invoice rail, invoice split payout, products-list visibility | blocks closing §1.1/§2 properly |
 
@@ -33,9 +33,7 @@ please mirror it so the UI works unmodified when switched to `live`.
 
 > **FE update (this batch):** the live `DemoDataNotice` gates are gone. The create form is
 > constrained to **one item, quantity fixed at 1** (PM ruling) and the client sends
-> `items: [{product_id, quantity: 1}]`. Until the routes below exist, calls degrade to the
-> friendly *"isn't available on the Live API yet"* message; `POST /invoices/:id/pay` remains
-> stubbed pending §6.1 (payment rail).
+> `items: [{product_id, quantity: 1}]`. The routes below are now live: `GET /invoices/:id` requires auth (seller owner or buyer contact-match); `POST /invoices/:id/pay` creates a normal order + Monnify checkout (redirects to `/dashboard/orders/:id`). The FE fallback only triggers on genuine 404s.
 
 **Suggested Prisma models**
 
@@ -75,7 +73,7 @@ model InvoiceItem {
 |---|---|---|
 | `GET` | `/invoices` | seller scope, newest first |
 | `POST` | `/invoices` | create |
-| `GET` | `/invoices/:id` | **public** (no auth) — buyer opens share link; embeds `seller.business_name` |
+| `GET` | `/invoices/:id` | **auth required** — seller (owner) or buyer (contact-match); embeds `seller.business_name` |
 | `POST` | `/invoices/:id/cancel` | only from `pending` → else `409 {code:"INVALID_TRANSITION"}` |
 
 `POST /invoices` request:
@@ -281,7 +279,7 @@ Legend: ✅ exists & wired · ⚠️ exists with gaps (item id) · ❌ missing �
 | Products list | ✓ | ✅ | ⚠️ R7, R8 | |
 | Products create/patch | ✓ | ✅ | ⚠️ V1–V4 | |
 | Products **delete** | ✓ | ✅ | ✅ §1.2 (handler shipped in this repo) | returns `409 PRODUCT_HAS_ORDERS` when referenced |
-| **Invoices** list/create/detail/cancel/public + **pay→order** | ✅ live gates removed — constrained form (1 item × qty 1) + graceful 404 fallback | ✅ (§1.1, incl. `POST /invoices/:id/pay`) | ❌ §1.1 | **build §1.1 to light up live**; pay pending §6 |
+| **Invoices** list/create/detail/cancel + **pay→order** | ✅ live gates removed — constrained form (1 item × qty 1), auth + buyer contact-match, Monnify checkout redirect | ✅ (§1.1, incl. `POST /invoices/:id/pay`) | ✅ §1.1 | **shipped** — GET is authenticated (was public); pay produces a normal order (§6.1 resolved) |
 | **Star ratings** (POST + order embed + seller avg) | ✓ buyer widget on order detail, seller avg on profile | ✅ §1.5 | ✅ §1.5 | new `ratings` table — prod needs `migrate deploy` |
 | Seller public profile + reputation | ✓ storefront `/s/[sellerId]` (FE-03) + FE-10 badge (storefront + dashboard home) | ✅ + `rating` | ✅ + `rating` | public products via `GET /products?seller_id=` (§1.6) |
 | Order detail buyer embed (`buyer:{name,email,created_at,order_count}`) | ✓ seller-side buyer card | ✅ §1.6 | ✅ §1.6 | buyer "Seller" row links to storefront |
@@ -301,8 +299,7 @@ passworded demo buyer accounts (`demo1234`), role-agnostic `POST /auth/otp/verif
 
 ## 6. Open questions for BE
 
-1. Invoice payment rail: reuse the existing Monnify order flow (invoice → pay → order) or a
-   dedicated invoice checkout? §1.1 assumes invoice payment **produces a normal order**.
+1. ~~Invoice payment rail: reuse the existing Monnify order flow (invoice → pay → order) or a
+   dedicated invoice checkout?~~ **RESOLVED:** invoice payment produces a normal order via the existing Monnify checkout; pay requires buyer contact-match (403 otherwise); redirectUrl lands on `/dashboard/orders/:id`.
 2. Split payout on invoice payment — same beneficiary logic as orders (decision-log D6 env vars)?
-3. Should `GET /products` stay public for a future storefront (authenticated by nothing), or is
-   seller-scoping fine? (R7 assumes seller-scoped; public browse would need `?seller_id=` + no auth.)
+3. ~~Should `GET /products` stay public for a future storefront, or is seller-scoping fine?~~ **RESOLVED (D23):** public **with `seller_id`** (storefront catalog, no auth); missing `seller_id` + no auth → `401` (R7); authed + no `seller_id` → scoped to the token's seller.

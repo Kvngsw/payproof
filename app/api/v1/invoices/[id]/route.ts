@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import db from '@/lib/db';
 import { authenticate, getRequestId } from '@/lib/auth';
-import { shapeInvoice } from '@/lib/invoices';
+import { shapeInvoice, buyerMatchesContact } from '@/lib/invoices';
 import { ok, unauthorized, forbidden, notFound, handleError } from '@/lib/api-response';
 
 export const dynamic = 'force-dynamic';
@@ -30,8 +30,8 @@ export async function GET(request: NextRequest, { params }: Params) {
     if (claims.role === 'seller') {
       if (invoice.sellerId !== sub) return forbidden('You can only view your own invoices.');
     } else {
-      const buyer = await db.buyer.findUnique({ where: { id: sub }, select: { email: true } });
-      if (!buyer || buyer.email.toLowerCase() !== invoice.customerContact.toLowerCase()) {
+      const buyer = await db.buyer.findUnique({ where: { id: sub } });
+      if (!buyer || !buyerMatchesContact(buyer, invoice.customerContact)) {
         return forbidden('This invoice was not issued to you.');
       }
     }

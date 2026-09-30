@@ -48,10 +48,10 @@
 | E24 | `POST /orders/:id/cancel` | buyer (owner) | — | `200 {order}` — only from `Pending Payment` | INT-04 |
 | E25 | `GET /invoices` | seller | — | `[Invoice]` newest first | BE-15 |
 | E26 | `POST /invoices` | seller | `{code?, items:[{product_id, quantity}], customer_name, customer_contact, note?}` — live mode: 1 item, quantity 1 (D22) | `201 Invoice` · `409 OUT_OF_STOCK` | BE-15 |
-| E27 | `GET /invoices/:id` | public | — | `Invoice` + `seller.business_name` | BE-15 |
+| E27 | `GET /invoices/:id` | seller (owner) or buyer (contact-match) | — | `Invoice` + `seller.business_name` | BE-15 |
 | E28 | `POST /invoices/:id/cancel` | seller (owner) | — | `200 Invoice` · `409 INVALID_TRANSITION` unless `pending` | BE-15 |
 
-"Invoice payment creates a normal order via the existing checkout (D22). Paying a cancelled or already-paid invoice → 409. Invoice shape: see api-requests.md §1.1."
+"Invoice payment creates a normal order via the existing checkout (D22). Paying a cancelled or already-paid invoice → 409. Pay requires the buyer contact to match the invoice contact (403 otherwise); Monnify redirectUrl lands on /dashboard/orders/:id. Invoice shape: see api-requests.md §1.1."
 
 ### 7.3 Order object (E14)
 

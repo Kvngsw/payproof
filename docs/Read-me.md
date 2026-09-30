@@ -102,7 +102,7 @@ Sign-up: `/signup` → buyer (single form) or seller (single form, name/email/pa
 
 *(Fill in as things get cut — do this continuously, not at the end.)*
 
-- [ ] Invoices — frontend flow works against a local mock; backend endpoints (`/invoices`, api-requests.md §1.1) in progress (decision-log D19b/D22). Not part of the demo path.
+- [x] Invoices — backend endpoints live (`/invoices` list/create/authenticated-get/cancel + pay→order, api-requests.md §1.1); FE wired with auth, contact-match buyer access, Monnify checkout redirect (decision-log D19b/D22).
 - [ ] No refund or auto-cancel for paid orders that never ship — funds stay held, seller unpaid
 - [ ] No auto-release if a buyer never confirms delivery
 - [ ] Cancelled (unpaid) orders count against seller reputation (decision-log D21)

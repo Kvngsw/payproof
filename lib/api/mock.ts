@@ -384,7 +384,7 @@ export type MockInvoice = {
   total_kobo: number;
   customer: { name: string; contact: string };
   note: string;
-  status: "pending" | "paid" | "cancelled";
+  status: "pending" | "processing" | "paid" | "cancelled";
   order_id: string | null;
   created_at: string;
   paid_at: string | null;
@@ -455,7 +455,7 @@ export async function getInvoice(id: string): Promise<MockInvoice> {
 export async function payInvoice(
   id: string,
   payload: { delivery_address: string; phone: string },
-): Promise<{ order_id: string }> {
+): Promise<{ order_id: string; checkout_url?: string }> {
   return authFetch(`/invoices/${encodeURIComponent(id)}/pay`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -463,7 +463,7 @@ export async function payInvoice(
 }
 
 export function invoiceLink(id: string) {
-  const path = `/dashboard?invoice=${encodeURIComponent(id)}`;
+  const path = `/i/${encodeURIComponent(id)}`;
   if (typeof window === "undefined") return path;
   return `${window.location.origin}${path}`;
 }
