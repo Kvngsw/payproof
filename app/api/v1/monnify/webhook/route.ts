@@ -107,20 +107,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ACK first: slow webhooks get retried by Monnify, so claim-then-respond
-  const processing = handleNotification(String(paymentRef), String(transactionRef), requestId);
-
-  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
-    processing.catch((err) => {
-      logger.error('Webhook: background processing failed', {
-        transactionRef,
-        err,
-        requestId,
-      });
-    });
-  } else {
-    await processing;
-  }
+  // Await processing before ACK: serverless freezes CPU after the response,
+  // so fire-and-forget orphans the claim and the payment is never recorded.
+  // Slower responses (~5s) beat lost money; duplicates converge via idempotency.
+  await handleNotification(String(paymentRef), String(transactionRef), requestId);
 
   return ACK();
 }
